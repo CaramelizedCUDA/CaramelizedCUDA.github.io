@@ -1,0 +1,4651 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Caramelized Notes · 焦糖笔记 — CaramelizedCUDA</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Newsreader:ital,opsz,wght@0,6..72,400..600;1,6..72,400&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      /* Default Theme: 焦糖和纸 (Anthropic Warm Archival Paper) */
+      --bg-page: #f6f3ec;
+      --bg-surface: #fcfaf6;
+      --bg-surface-secondary: #f0ebe1;
+      --bg-pro-tile: #191816;
+      --text-pro-tile: #f6f3ec;
+      --bg-code: #161514;
+      --bg-subtle: rgba(38, 31, 24, 0.045);
+      --bg-subtle-hover: rgba(38, 31, 24, 0.085);
+      --bg-glass: rgba(246, 243, 236, 0.84);
+      --bg-sheet: rgba(252, 250, 246, 0.94);
+
+      --text-primary: #191816;
+      --text-secondary: #524c44;
+      --text-muted: #857d73;
+      --accent-primary: #c86446;
+      --accent-hover: #b45336;
+      --accent-soft: rgba(200, 100, 70, 0.11);
+      --code-inline-fg: #a14429;
+
+      --hairline: rgba(38, 31, 24, 0.085);
+      --hairline-strong: rgba(38, 31, 24, 0.16);
+      --card-shadow: 0 4px 24px rgba(38, 31, 24, 0.04), 0 1px 2px rgba(38, 31, 24, 0.025);
+      --card-shadow-hover: 0 22px 48px rgba(38, 31, 24, 0.095), 0 2px 6px rgba(38, 31, 24, 0.035);
+      --specular-sheen: rgba(200, 100, 70, 0.055);
+
+      /* Font Stacks */
+      --font-sans: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei UI', 'Segoe UI', 'Noto Sans SC', sans-serif;
+      --font-serif-display: 'Newsreader', 'Songti SC', 'STSong', 'Noto Serif SC', Georgia, serif;
+      --font-mono: 'JetBrains Mono', ui-monospace, 'Cascadia Mono', 'SFMono-Regular', Menlo, Consolas, monospace;
+
+      /* Bounded Reader Customizer Variables */
+      --reader-font-family: var(--font-sans);
+      --reader-font-size: 17px;
+      --reader-line-height: 1.85;
+      --reader-max-width: 740px;
+
+      /* Fluid Spring Timing */
+      --ease-spring: cubic-bezier(0.32, 0.72, 0, 1);
+      --dur-fast: 220ms;
+      --dur-base: 460ms;
+      --dur-zoom: 680ms;
+    }
+
+    [data-theme="night"] {
+      /* Warm Charcoal Dark */
+      --bg-page: #121110;
+      --bg-surface: #1b1a18;
+      --bg-surface-secondary: #22201d;
+      --bg-pro-tile: #201e1b;
+      --text-pro-tile: #f2efe9;
+      --bg-code: #0d0c0b;
+      --bg-subtle: rgba(242, 239, 233, 0.065);
+      --bg-subtle-hover: rgba(242, 239, 233, 0.11);
+      --bg-glass: rgba(18, 17, 16, 0.82);
+      --bg-sheet: rgba(27, 26, 24, 0.94);
+
+      --text-primary: #f2efe9;
+      --text-secondary: #a8a196;
+      --text-muted: #726b61;
+      --accent-primary: #e08263;
+      --accent-hover: #eb9376;
+      --accent-soft: rgba(224, 130, 99, 0.16);
+      --code-inline-fg: #f09e82;
+
+      --hairline: rgba(242, 239, 233, 0.09);
+      --hairline-strong: rgba(242, 239, 233, 0.17);
+      --card-shadow: 0 12px 34px rgba(0, 0, 0, 0.44);
+      --card-shadow-hover: 0 24px 54px rgba(0, 0, 0, 0.65);
+      --specular-sheen: rgba(224, 130, 99, 0.085);
+    }
+
+    [data-theme="daylight"] {
+      /* Daylight Gallery */
+      --bg-page: #f5f5f7;
+      --bg-surface: #ffffff;
+      --bg-surface-secondary: #fbfbfd;
+      --bg-pro-tile: #1d1d1f;
+      --text-pro-tile: #f5f5f7;
+      --bg-code: #161617;
+      --bg-subtle: rgba(0, 0, 0, 0.042);
+      --bg-subtle-hover: rgba(0, 0, 0, 0.075);
+      --bg-glass: rgba(245, 245, 247, 0.82);
+      --bg-sheet: rgba(255, 255, 255, 0.92);
+
+      --text-primary: #1d1d1f;
+      --text-secondary: #515154;
+      --text-muted: #86868b;
+      --accent-primary: #0066cc;
+      --accent-hover: #0077ed;
+      --accent-soft: rgba(0, 102, 204, 0.10);
+      --code-inline-fg: #0055b3;
+
+      --hairline: rgba(0, 0, 0, 0.065);
+      --hairline-strong: rgba(0, 0, 0, 0.13);
+      --card-shadow: 0 4px 24px rgba(0, 0, 0, 0.035), 0 1px 2px rgba(0, 0, 0, 0.02);
+      --card-shadow-hover: 0 22px 48px rgba(0, 0, 0, 0.085), 0 2px 6px rgba(0, 0, 0, 0.03);
+      --specular-sheen: rgba(0, 102, 204, 0.045);
+    }
+
+    [data-motion="subtle"] {
+      --dur-fast: 140ms;
+      --dur-base: 240ms;
+      --dur-zoom: 300ms;
+    }
+
+    [data-motion="none"] {
+      --dur-fast: 0ms;
+      --dur-base: 0ms;
+      --dur-zoom: 0ms;
+    }
+
+    [data-motion="none"] *,
+    [data-motion="none"] *::before,
+    [data-motion="none"] *::after {
+      animation-duration: 0.001ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.001ms !important;
+      scroll-behavior: auto !important;
+    }
+
+    *,
+    *::before,
+    *::after {
+      box-sizing: border-box;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+
+    html {
+      scroll-behavior: smooth;
+    }
+
+    body {
+      margin: 0;
+      font-family: var(--font-sans);
+      background-color: var(--bg-page);
+      color: var(--text-primary);
+      line-height: 1.55;
+      transition: background-color var(--dur-base) var(--ease-spring), color var(--dur-base) var(--ease-spring);
+      overflow-x: hidden;
+    }
+
+    button,
+    input,
+    select {
+      font: inherit;
+      color: inherit;
+    }
+
+    button {
+      border: 0;
+      background: none;
+      padding: 0;
+      cursor: pointer;
+    }
+
+    button:focus-visible,
+    a:focus-visible,
+    input:focus-visible,
+    select:focus-visible {
+      outline: 2px solid var(--accent-primary);
+      outline-offset: 2px;
+    }
+
+    .hidden {
+      display: none !important;
+    }
+
+    .tabular-nums {
+      font-variant-numeric: tabular-nums;
+    }
+
+    .mono {
+      font-family: var(--font-mono);
+    }
+
+    .display-serif {
+      font-family: var(--font-serif-display);
+      letter-spacing: -0.024em;
+    }
+
+    .eyebrow {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+    }
+
+    /* Layout Container */
+    .site-shell {
+      max-width: 1340px;
+      margin: 0 auto;
+      padding-left: 24px;
+      padding-right: 24px;
+    }
+
+    /* Reading Progress Hairline */
+    #reading-progress-track {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 2px;
+      z-index: 90;
+      pointer-events: none;
+    }
+
+    #reading-progress-bar {
+      height: 100%;
+      width: 0%;
+      background: var(--accent-primary);
+      transition: width 90ms linear;
+    }
+
+    /* Optical Cross-Fade Layer */
+    #shutter-wipe {
+      pointer-events: none;
+      position: fixed;
+      inset: 0;
+      z-index: 80;
+      background: var(--bg-page);
+      opacity: 0;
+    }
+
+    @keyframes opticalVeil {
+      0% { opacity: 0.22; }
+      100% { opacity: 0; }
+    }
+
+    #shutter-wipe.is-passing {
+      animation: opticalVeil 260ms var(--ease-spring) forwards;
+    }
+
+    /* Sticky Frosted Masthead */
+    .masthead {
+      position: sticky;
+      top: 0;
+      z-index: 50;
+      background: var(--bg-glass);
+      backdrop-filter: saturate(180%) blur(20px);
+      -webkit-backdrop-filter: saturate(180%) blur(20px);
+      border-bottom: 1px solid var(--hairline);
+    }
+
+    .masthead-inner {
+      height: 60px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 14px;
+    }
+
+    .brand-btn {
+      display: flex;
+      align-items: center;
+      gap: 11px;
+      text-align: left;
+      min-width: 0;
+    }
+
+    .brand-mark {
+      width: 34px;
+      height: 34px;
+      border-radius: 50%;
+      overflow: hidden;
+      padding: 0;
+      background: #ffffff;
+      color: var(--text-pro-tile);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      border: 1px solid var(--hairline-strong);
+      box-shadow: 0 2px 6px rgba(38, 31, 24, 0.08);
+      transition: transform var(--dur-fast) var(--ease-spring);
+    }
+
+    .brand-avatar-img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      object-position: 50% 35%;
+      display: block;
+    }
+
+    .brand-btn:hover .brand-mark {
+      transform: scale(1.05);
+    }
+
+    .brand-text {
+      display: flex;
+      align-items: baseline;
+      gap: 8px;
+      min-width: 0;
+      white-space: nowrap;
+      overflow: hidden;
+    }
+
+    .brand-title {
+      font-family: var(--font-serif-display);
+      font-weight: 600;
+      font-size: 16.5px;
+      letter-spacing: -0.015em;
+    }
+
+    .brand-cn {
+      font-size: 13px;
+      color: var(--text-secondary);
+      font-weight: 500;
+    }
+
+    .brand-author {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+
+    /* Segmented Capsule Controls */
+    .capsule-segmented {
+      display: inline-flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 2px;
+      padding: 3px;
+      border-radius: 980px;
+      background: var(--bg-subtle);
+      border: 1px solid var(--hairline);
+    }
+
+    .capsule-seg-item {
+      border-radius: 980px;
+      padding: 5px 13px;
+      font-size: 12.5px;
+      font-weight: 500;
+      color: var(--text-secondary);
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition:
+        background-color var(--dur-fast) var(--ease-spring),
+        color var(--dur-fast) var(--ease-spring),
+        box-shadow var(--dur-fast) var(--ease-spring);
+    }
+
+    .capsule-seg-item:hover {
+      color: var(--text-primary);
+    }
+
+    .nav-pill-active {
+      background: var(--bg-surface) !important;
+      color: var(--text-primary) !important;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08), 0 0.5px 1px rgba(0, 0, 0, 0.05);
+      font-weight: 600;
+    }
+
+    [data-theme="night"] .nav-pill-active {
+      background: #2c2925 !important;
+      color: #f2efe9 !important;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.42);
+    }
+
+    .nav-count-badge {
+      font-family: var(--font-mono);
+      font-size: 10.5px;
+      padding: 1px 6px;
+      border-radius: 980px;
+      background: var(--accent-soft);
+      color: var(--accent-primary);
+      font-variant-numeric: tabular-nums;
+    }
+
+    .masthead-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-shrink: 0;
+    }
+
+    /* Pill & Circle Buttons */
+    .editorial-pill-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      border-radius: 980px;
+      font-size: 12.5px;
+      font-weight: 500;
+      padding: 7px 14px;
+      letter-spacing: -0.008em;
+      user-select: none;
+      transition:
+        transform var(--dur-fast) var(--ease-spring),
+        background-color var(--dur-fast) var(--ease-spring),
+        color var(--dur-fast) var(--ease-spring),
+        border-color var(--dur-fast) var(--ease-spring);
+    }
+
+    .editorial-pill-btn:active {
+      transform: scale(0.97);
+    }
+
+    .editorial-pill-primary {
+      background: var(--accent-primary);
+      color: #ffffff;
+    }
+
+    .editorial-pill-primary:hover {
+      background: var(--accent-hover);
+    }
+
+    .editorial-pill-secondary {
+      background: var(--bg-subtle);
+      color: var(--text-primary);
+      border: 1px solid var(--hairline);
+    }
+
+    .editorial-pill-secondary:hover {
+      background: var(--bg-subtle-hover);
+    }
+
+    .editorial-circle-action {
+      width: 34px;
+      height: 34px;
+      border-radius: 50%;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      background: var(--bg-subtle);
+      color: var(--text-secondary);
+      border: 1px solid var(--hairline);
+      flex-shrink: 0;
+      transition:
+        background-color var(--dur-fast) var(--ease-spring),
+        color var(--dur-fast) var(--ease-spring),
+        transform var(--dur-fast) var(--ease-spring);
+    }
+
+    .bento-interactive:hover .editorial-circle-action,
+    .editorial-circle-action:hover {
+      background: var(--accent-primary);
+      color: #ffffff;
+      border-color: transparent;
+      transform: scale(1.05);
+    }
+
+    .theme-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--accent-primary);
+      display: inline-block;
+    }
+
+    .mobile-menu-btn {
+      display: none;
+      padding: 7px 10px;
+    }
+
+    .mobile-nav-panel {
+      border-top: 1px solid var(--hairline);
+      padding: 12px 24px 16px;
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+    }
+
+    /* Bento Surface System */
+    .bento-tile {
+      position: relative;
+      background: var(--bg-surface);
+      border-radius: 26px;
+      border: 1px solid var(--hairline);
+      box-shadow: var(--card-shadow);
+      overflow: hidden;
+      transition:
+        transform var(--dur-base) var(--ease-spring),
+        box-shadow var(--dur-base) var(--ease-spring),
+        background-color var(--dur-base) var(--ease-spring),
+        border-color var(--dur-base) var(--ease-spring);
+    }
+
+    [data-theme="night"] .bento-tile {
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.055), var(--card-shadow);
+    }
+
+    .bento-interactive {
+      cursor: pointer;
+    }
+
+    .bento-interactive:hover {
+      transform: translateY(-3px);
+      box-shadow: var(--card-shadow-hover);
+    }
+
+    [data-motion="subtle"] .bento-interactive:hover {
+      transform: translateY(-2px);
+    }
+
+    [data-motion="none"] .bento-interactive:hover {
+      transform: none;
+    }
+
+    .bento-sheen::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      opacity: 0;
+      background: radial-gradient(
+        480px circle at var(--mx, 50%) var(--my, 50%),
+        var(--specular-sheen),
+        transparent 62%
+      );
+      transition: opacity var(--dur-base) var(--ease-spring);
+      z-index: 1;
+    }
+
+    [data-motion="full"] .bento-sheen:hover::before {
+      opacity: 1;
+    }
+
+    /* View Transitions */
+    @keyframes editorialStageIn {
+      0% {
+        opacity: 0;
+        transform: translateY(10px);
+      }
+      100% {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    .animate-stage {
+      animation: editorialStageIn var(--dur-base) var(--ease-spring) both;
+    }
+
+    .main-canvas {
+      padding-top: 32px;
+      padding-bottom: 56px;
+    }
+
+    /* ==================== HOME: FOUR-ACT EDITORIAL NARRATIVE ==================== */
+    .home-stack {
+      display: flex;
+      flex-direction: column;
+      gap: 44px;
+    }
+
+    /* Act 1: Hero Row (Fable Paper Stage + Top-Right Author Profile Card) */
+    .home-hero-row {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 272px;
+      gap: 20px;
+      align-items: stretch;
+    }
+
+    .author-profile-card {
+      padding: 20px 20px 18px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      gap: 14px;
+      min-width: 0;
+      background-image: radial-gradient(120% 60% at 50% 0%, rgba(184, 90, 48, 0.06), transparent 70%);
+    }
+
+    [data-theme="night"] .author-profile-card {
+      background-image: radial-gradient(120% 60% at 50% 0%, rgba(217, 130, 88, 0.08), transparent 70%);
+    }
+
+    .profile-head-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+
+    .profile-head-row .eyebrow {
+      font-size: 10.5px;
+      letter-spacing: 0.06em;
+      white-space: nowrap;
+    }
+
+    .profile-exlibris {
+      font-family: var(--font-serif-display);
+      font-style: italic;
+      font-size: 11px;
+      color: var(--text-muted);
+      letter-spacing: 0.02em;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+
+    .profile-identity-wrap {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+    }
+
+    .profile-avatar-btn {
+      width: 96px;
+      height: 96px;
+      border-radius: 50%;
+      padding: 4px;
+      background: var(--bg-page);
+      border: 1px solid var(--hairline-strong);
+      box-shadow: 0 8px 24px -6px rgba(32, 24, 16, 0.12), 0 0 0 3px var(--bg-surface);
+      overflow: hidden;
+      cursor: zoom-in;
+      transition: transform var(--dur-fast) var(--ease-spring), box-shadow var(--dur-fast) var(--ease-spring);
+    }
+
+    [data-theme="night"] .profile-avatar-btn {
+      box-shadow: 0 10px 26px -4px rgba(0, 0, 0, 0.5), 0 0 0 3px var(--bg-surface);
+    }
+
+    .profile-avatar-btn:hover {
+      transform: scale(1.04);
+    }
+
+    .profile-avatar-img {
+      width: 100%;
+      height: 100%;
+      border-radius: 50%;
+      object-fit: cover;
+      object-position: 50% 35%;
+      display: block;
+    }
+
+    .profile-name {
+      margin: 11px 0 2px;
+      font-size: 19px;
+      font-weight: 600;
+      color: var(--text-primary);
+      line-height: 1.25;
+      word-break: break-word;
+    }
+
+    .profile-role {
+      font-size: 12px;
+      color: var(--text-muted);
+      line-height: 1.4;
+    }
+
+    .profile-bio-section {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .profile-bio {
+      margin: 0;
+      font-size: 12.6px;
+      line-height: 1.65;
+      color: var(--text-secondary);
+      text-align: center;
+      text-wrap: balance;
+      text-autospace: normal;
+    }
+
+    .profile-tags {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 6px;
+    }
+
+    .profile-tag {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      padding: 2px 9px;
+      border-radius: 980px;
+      background: var(--bg-subtle);
+      border: 1px solid var(--hairline);
+      color: var(--text-secondary);
+      white-space: nowrap;
+    }
+
+    .profile-footer {
+      border-top: 1px solid var(--hairline);
+      padding-top: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .profile-stats-line {
+      font-family: var(--font-mono);
+      font-size: 11.5px;
+      color: var(--text-muted);
+      text-align: center;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .profile-actions-row {
+      display: flex;
+      justify-content: center;
+    }
+
+    .profile-action-link {
+      width: 100%;
+      padding: 7px 12px;
+      font-size: 12px;
+      text-decoration: none;
+      white-space: nowrap;
+      justify-content: center;
+    }
+
+    .profile-action-link:hover {
+      border-color: var(--accent-primary);
+      color: var(--text-primary);
+    }
+
+    /* Act 1: Editorial Masthead & Fable Paper Stage */
+    .hero-fable-stage {
+      position: relative;
+      border-radius: 30px;
+      padding: 30px 32px;
+      background: var(--bg-page);
+      border: 1px solid var(--hairline);
+      overflow: hidden;
+      isolation: isolate;
+    }
+
+    .hero-fable-backdrop {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      overflow: hidden;
+      z-index: 0;
+    }
+
+    .hero-fable-bg-img {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      object-position: center;
+      mix-blend-mode: multiply;
+      opacity: 0.72;
+      -webkit-mask-image: radial-gradient(ellipse 46% 56% at 32% 48%, rgba(0, 0, 0, 0.14) 0%, rgba(0, 0, 0, 0.56) 54%, rgba(0, 0, 0, 1) 90%);
+      mask-image: radial-gradient(ellipse 46% 56% at 32% 48%, rgba(0, 0, 0, 0.14) 0%, rgba(0, 0, 0, 0.56) 54%, rgba(0, 0, 0, 1) 90%);
+      transition: opacity var(--dur-base) var(--ease-spring), filter var(--dur-base) var(--ease-spring);
+    }
+
+    .hero-paper-sketch-img {
+      position: absolute;
+      left: 35%;
+      bottom: -10px;
+      width: 215px;
+      height: auto;
+      aspect-ratio: 720 / 660;
+      object-fit: contain;
+      mix-blend-mode: multiply;
+      opacity: 0.22;
+      -webkit-mask-image: radial-gradient(ellipse 68% 68% at 50% 54%, rgba(0, 0, 0, 0.96) 24%, transparent 78%);
+      mask-image: radial-gradient(ellipse 68% 68% at 50% 54%, rgba(0, 0, 0, 0.96) 24%, transparent 78%);
+      transition: opacity var(--dur-base) var(--ease-spring), filter var(--dur-base) var(--ease-spring);
+    }
+
+    [data-theme="daylight"] .hero-fable-bg-img {
+      mix-blend-mode: multiply;
+      filter: saturate(0.85) brightness(1.03);
+      opacity: 0.56;
+    }
+
+    [data-theme="daylight"] .hero-paper-sketch-img {
+      mix-blend-mode: multiply;
+      filter: saturate(0.85) brightness(1.03);
+      opacity: 0.16;
+    }
+
+    [data-theme="night"] .hero-fable-bg-img {
+      filter: invert(0.92) hue-rotate(180deg) sepia(0.28) saturate(0.78) brightness(0.88);
+      mix-blend-mode: screen;
+      opacity: 0.24;
+    }
+
+    [data-theme="night"] .hero-paper-sketch-img {
+      filter: invert(0.92) hue-rotate(180deg) sepia(0.28) saturate(0.78) brightness(0.88);
+      mix-blend-mode: screen;
+      opacity: 0.14;
+    }
+
+    .act-masthead {
+      position: relative;
+      z-index: 1;
+      display: grid;
+      grid-template-columns: minmax(0, 1.35fr) minmax(0, 0.95fr);
+      gap: 24px;
+      align-items: stretch;
+    }
+
+    .masthead-manifesto {
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      gap: 20px;
+      padding: 6px 4px 4px 0;
+    }
+
+    .masthead-actions-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .hero-fable-preview-btn {
+      font-size: 12px;
+      padding: 6px 13px;
+      background: rgba(252, 250, 246, 0.76);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+    }
+
+    [data-theme="daylight"] .hero-fable-preview-btn {
+      background: rgba(255, 255, 255, 0.8);
+    }
+
+    [data-theme="night"] .hero-fable-preview-btn {
+      background: rgba(27, 26, 24, 0.72);
+    }
+
+    .manifesto-h1 {
+      margin: 10px 0 0;
+      font-family: var(--font-serif-display);
+      font-size: clamp(1.9rem, 3.3vw, 2.75rem);
+      font-weight: 500;
+      line-height: 1.2;
+      letter-spacing: -0.025em;
+      text-autospace: normal;
+    }
+
+    .manifesto-lead {
+      margin: 14px 0 0;
+      font-size: 15px;
+      line-height: 1.75;
+      color: var(--text-secondary);
+      max-width: 56ch;
+      text-autospace: normal;
+    }
+
+    .axioms-card {
+      padding: 24px 26px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      gap: 18px;
+      background: rgba(252, 250, 246, 0.72);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+    }
+
+    [data-theme="daylight"] .axioms-card {
+      background: rgba(255, 255, 255, 0.76);
+    }
+
+    [data-theme="night"] .axioms-card {
+      background: rgba(27, 26, 24, 0.76);
+    }
+
+    .masthead-companion {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      padding: 12px 14px;
+      border-radius: 18px;
+      background: rgba(240, 235, 225, 0.72);
+      border: 1px solid var(--hairline);
+    }
+
+    [data-theme="daylight"] .masthead-companion {
+      background: rgba(245, 245, 247, 0.82);
+    }
+
+    [data-theme="night"] .masthead-companion {
+      background: rgba(34, 32, 29, 0.82);
+    }
+
+    .masthead-companion-thumb-btn {
+      width: 76px;
+      height: 76px;
+      border-radius: 16px;
+      overflow: hidden;
+      border: 1px solid var(--hairline);
+      background: var(--bg-page);
+      flex-shrink: 0;
+      cursor: zoom-in;
+      transition: transform var(--dur-fast) var(--ease-spring);
+    }
+
+    .masthead-companion-thumb-btn:hover {
+      transform: scale(1.04);
+    }
+
+    .masthead-companion-img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      object-position: 50% 24%;
+      mix-blend-mode: multiply;
+      display: block;
+    }
+
+    [data-theme="night"] .masthead-companion-img {
+      mix-blend-mode: normal;
+      filter: brightness(0.94) contrast(1.03);
+    }
+
+    .masthead-companion-copy {
+      min-width: 0;
+    }
+
+    .masthead-companion-title {
+      font-size: 14px;
+      font-weight: 650;
+      color: var(--text-primary);
+      margin-top: 3px;
+      line-height: 1.35;
+    }
+
+    .masthead-companion-sub {
+      font-size: 12.2px;
+      line-height: 1.55;
+      color: var(--text-secondary);
+      margin-top: 3px;
+      text-autospace: normal;
+    }
+
+    .axioms-rhythm-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .axioms-rhythm-head .eyebrow {
+      letter-spacing: 0.08em;
+    }
+
+    .axioms-rhythm-since {
+      font-size: 11px;
+      color: var(--text-muted);
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+
+    .axioms-list {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      margin: 0;
+      padding: 0;
+      list-style: none;
+    }
+
+    .axiom-item {
+      display: grid;
+      grid-template-columns: 28px minmax(0, 1fr);
+      gap: 10px;
+      align-items: start;
+      padding-top: 12px;
+      border-top: 1px solid var(--hairline);
+    }
+
+    .axiom-item:first-child {
+      padding-top: 0;
+      border-top: 0;
+    }
+
+    .axiom-num {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--accent-primary);
+      padding-top: 3px;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .axiom-title {
+      font-size: 13.5px;
+      font-weight: 600;
+      color: var(--text-primary);
+      margin-bottom: 2px;
+    }
+
+    .axiom-desc {
+      font-size: 12.5px;
+      line-height: 1.58;
+      color: var(--text-secondary);
+    }
+
+    /* Section Header */
+    .section-head-row {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 16px;
+      flex-wrap: wrap;
+    }
+
+    .section-title {
+      margin: 0;
+      font-size: 20px;
+      font-weight: 650;
+      letter-spacing: -0.018em;
+    }
+
+    /* Lead Article Key Takeaway Panel */
+    .takeaway-panel {
+      background: var(--bg-surface-secondary);
+      color: var(--text-primary);
+      border-radius: 20px;
+      border: 1px solid var(--hairline-strong);
+      padding: 20px 22px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      gap: 14px;
+      min-width: 0;
+    }
+
+    .takeaway-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+    }
+
+    .takeaway-eyebrow {
+      font-family: var(--font-mono);
+      font-size: 10.5px;
+      font-weight: 600;
+      letter-spacing: 0.07em;
+      text-transform: uppercase;
+      color: var(--accent-primary);
+    }
+
+    .takeaway-title {
+      font-size: 14.5px;
+      font-weight: 600;
+      color: var(--text-primary);
+      margin: 4px 0 0;
+      line-height: 1.45;
+    }
+
+    .takeaway-bullets {
+      margin: 0;
+      padding-left: 1.15rem;
+      display: flex;
+      flex-direction: column;
+      gap: 7px;
+      font-size: 13px;
+      line-height: 1.62;
+      color: var(--text-secondary);
+    }
+
+    .takeaway-snippet {
+      background: var(--bg-code);
+      color: #ece7df;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 14px;
+      padding: 10px 0;
+      overflow-x: auto;
+      font-family: var(--font-mono);
+      font-size: 11.5px;
+      line-height: 1.6;
+    }
+
+    .takeaway-proof {
+      font-size: 12px;
+      line-height: 1.55;
+      color: var(--text-muted);
+      padding-top: 10px;
+      border-top: 1px solid var(--hairline);
+    }
+
+    /* Causal Seam Dark Specimen Card (Reader Optional Head Frame) */
+    .specimen-panel {
+      background: var(--bg-pro-tile);
+      color: var(--text-pro-tile);
+      border-radius: 20px;
+      border: 1px solid rgba(255, 255, 255, 0.085);
+      padding: 20px 22px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      gap: 14px;
+      min-width: 0;
+    }
+
+    .specimen-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+    }
+
+    .specimen-eyebrow {
+      font-family: var(--font-mono);
+      font-size: 10.5px;
+      font-weight: 600;
+      letter-spacing: 0.07em;
+      text-transform: uppercase;
+      color: #e08263;
+    }
+
+    [data-theme="daylight"] .specimen-eyebrow {
+      color: #6ab0ff;
+    }
+
+    .specimen-dots {
+      display: inline-flex;
+      gap: 5px;
+      opacity: 0.5;
+    }
+
+    .specimen-dots span {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.45);
+    }
+
+    .specimen-title {
+      font-size: 14px;
+      font-weight: 600;
+      color: #faf6ee;
+      margin: 0;
+      line-height: 1.4;
+    }
+
+    .specimen-context {
+      font-size: 12px;
+      color: rgba(246, 243, 236, 0.65);
+      margin: 3px 0 0;
+      line-height: 1.5;
+    }
+
+    .specimen-lines {
+      background: rgba(0, 0, 0, 0.28);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 14px;
+      padding: 12px 0;
+      overflow-x: auto;
+      font-family: var(--font-mono);
+      font-size: 12px;
+      line-height: 1.65;
+    }
+
+    .specimen-line {
+      display: flex;
+      align-items: baseline;
+      gap: 10px;
+      padding: 2px 14px;
+      white-space: pre;
+      border-left: 3px solid transparent;
+    }
+
+    .specimen-line-ctx {
+      color: rgba(242, 239, 233, 0.74);
+    }
+
+    .specimen-line-del {
+      background: rgba(224, 108, 101, 0.13);
+      border-left-color: #e06c65;
+      color: #ffcdc9;
+    }
+
+    .specimen-line-ins {
+      background: rgba(126, 198, 153, 0.13);
+      border-left-color: #7ec699;
+      color: #d6f5df;
+    }
+
+    .specimen-prefix {
+      user-select: none;
+      opacity: 0.72;
+      width: 10px;
+      flex-shrink: 0;
+    }
+
+    .specimen-proof {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      font-family: var(--font-mono);
+      font-size: 11.5px;
+      line-height: 1.5;
+      color: rgba(246, 243, 236, 0.78);
+      padding-top: 10px;
+      border-top: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .specimen-proof-badge {
+      color: #7ec699;
+      font-weight: 600;
+      flex-shrink: 0;
+    }
+
+    /* Act 2: Lead Monograph Card */
+    .lead-monograph-card {
+      padding: 28px;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1.08fr);
+      gap: 28px;
+      align-items: stretch;
+    }
+
+    .lead-monograph-copy {
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      gap: 20px;
+      position: relative;
+      z-index: 2;
+    }
+
+    .meta-line {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 8px;
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+
+    .meta-issue {
+      font-family: var(--font-mono);
+      font-weight: 600;
+      font-size: 11px;
+      letter-spacing: 0.06em;
+      color: var(--accent-primary);
+      background: var(--accent-soft);
+      padding: 2px 9px;
+      border-radius: 980px;
+    }
+
+    .lead-title {
+      margin: 12px 0 0;
+      font-family: var(--font-serif-display);
+      font-size: clamp(1.5rem, 2.3vw, 2rem);
+      font-weight: 600;
+      line-height: 1.28;
+      letter-spacing: -0.02em;
+      text-autospace: normal;
+    }
+
+    .lead-title button {
+      text-align: left;
+    }
+
+    .lead-subtitle {
+      margin: 10px 0 0;
+      font-size: 14.5px;
+      line-height: 1.68;
+      color: var(--text-secondary);
+      text-autospace: normal;
+    }
+
+    .tag-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-top: 14px;
+    }
+
+    .tag-chip {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      padding: 3px 10px;
+      border-radius: 980px;
+      background: var(--bg-subtle);
+      color: var(--text-secondary);
+      border: 1px solid var(--hairline);
+    }
+
+    .card-footer-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding-top: 14px;
+      border-top: 1px solid var(--hairline);
+      flex-wrap: wrap;
+    }
+
+    .card-footer-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    /* Act 3: Editorial Post List */
+    .editorial-post-list {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .editorial-post-row {
+      padding: 22px 26px;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 24px;
+      align-items: center;
+    }
+
+    .editorial-post-main {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      min-width: 0;
+      position: relative;
+      z-index: 2;
+    }
+
+    .editorial-post-aside {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      justify-content: space-between;
+      gap: 12px;
+      flex-shrink: 0;
+      position: relative;
+      z-index: 2;
+    }
+
+    .editorial-post-thumb {
+      width: 144px;
+      height: 90px;
+      border-radius: 14px;
+      overflow: hidden;
+      border: 1px solid var(--hairline);
+      background: var(--bg-subtle);
+      flex-shrink: 0;
+    }
+
+    .editorial-post-thumb img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      object-position: 50% 24%;
+      display: block;
+      transition: transform var(--dur-base) var(--ease-spring);
+    }
+
+    .editorial-post-row:hover .editorial-post-thumb img {
+      transform: scale(1.04);
+    }
+
+    .editorial-post-title {
+      margin: 2px 0 0;
+      font-family: var(--font-serif-display);
+      font-size: clamp(1.18rem, 1.75vw, 1.42rem);
+      font-weight: 600;
+      line-height: 1.34;
+      text-autospace: normal;
+    }
+
+    .editorial-post-title button {
+      text-align: left;
+    }
+
+    .editorial-post-summary {
+      margin: 0;
+      font-size: 13.5px;
+      line-height: 1.68;
+      color: var(--text-secondary);
+      max-width: 68ch;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+      text-autospace: normal;
+    }
+
+    .editorial-post-meta-bottom {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 2px;
+    }
+
+    .stream-title {
+      margin: 10px 0 0;
+      font-family: var(--font-serif-display);
+      font-size: clamp(1.22rem, 1.8vw, 1.48rem);
+      font-weight: 600;
+      line-height: 1.32;
+      text-autospace: normal;
+    }
+
+    .stream-title button {
+      text-align: left;
+    }
+
+    .stream-summary {
+      margin: 8px 0 0;
+      font-size: 13.5px;
+      line-height: 1.68;
+      color: var(--text-secondary);
+      display: -webkit-box;
+      -webkit-line-clamp: 3;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+      text-autospace: normal;
+    }
+
+    /* Act 4: Visual Interlude & Micro Log */
+    .act-interlude-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1.28fr) minmax(0, 0.92fr);
+      gap: 22px;
+      align-items: stretch;
+    }
+
+    .interlude-card {
+      position: relative;
+      border-radius: 26px;
+      overflow: hidden;
+      min-height: 330px;
+      background: #141312;
+      border: 1px solid var(--hairline);
+      box-shadow: var(--card-shadow);
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      padding: 20px 22px;
+    }
+
+    .interlude-img {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      object-position: 50% 35%;
+      cursor: zoom-in;
+      transition: transform var(--dur-zoom) var(--ease-spring), opacity 320ms var(--ease-spring);
+    }
+
+    .interlude-card:hover .interlude-img {
+      transform: scale(1.03);
+    }
+
+    .interlude-scrim {
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(180deg, rgba(16, 14, 12, 0.08) 0%, rgba(16, 14, 12, 0.1) 42%, rgba(16, 14, 12, 0.86) 100%);
+      pointer-events: none;
+    }
+
+    #hero-particles {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      z-index: 1;
+    }
+
+    .interlude-top,
+    .interlude-bottom {
+      position: relative;
+      z-index: 2;
+      color: #f6f3ec;
+    }
+
+    .interlude-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      flex-wrap: wrap;
+      pointer-events: none;
+    }
+
+    .interlude-top > * {
+      pointer-events: auto;
+    }
+
+    .interlude-badge,
+    .interlude-zoom-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      padding: 5px 12px;
+      border-radius: 980px;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      letter-spacing: 0.05em;
+      background: rgba(18, 17, 16, 0.56);
+      border: 1px solid rgba(255, 255, 255, 0.18);
+      color: #f6f3ec;
+      backdrop-filter: blur(12px);
+    }
+
+    .interlude-zoom-btn {
+      font-family: var(--font-sans);
+      letter-spacing: 0;
+      transition: background-color var(--dur-fast) var(--ease-spring), transform var(--dur-fast) var(--ease-spring);
+    }
+
+    .interlude-zoom-btn:hover {
+      background: rgba(18, 17, 16, 0.78);
+    }
+
+    .interlude-bottom {
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
+      gap: 14px;
+      flex-wrap: wrap;
+      pointer-events: none;
+    }
+
+    .interlude-bottom > * {
+      pointer-events: auto;
+    }
+
+    .interlude-caption-title {
+      font-family: var(--font-serif-display);
+      font-size: 19px;
+      font-weight: 500;
+      margin: 0 0 3px;
+    }
+
+    .interlude-caption-sub {
+      font-size: 12.5px;
+      color: rgba(246, 243, 236, 0.82);
+      margin: 0;
+    }
+
+    .interlude-tabs {
+      display: inline-flex;
+      flex-wrap: wrap;
+      gap: 4px;
+      padding: 3px;
+      border-radius: 980px;
+      background: rgba(18, 17, 16, 0.62);
+      border: 1px solid rgba(255, 255, 255, 0.16);
+      backdrop-filter: blur(12px);
+      max-width: 100%;
+    }
+
+    .interlude-tab-btn {
+      font-size: 11.5px;
+      padding: 4px 10px;
+      border-radius: 980px;
+      color: rgba(246, 243, 236, 0.75);
+      transition: background-color var(--dur-fast) var(--ease-spring), color var(--dur-fast) var(--ease-spring);
+    }
+
+    .interlude-tab-btn.is-active {
+      background: #fcfaf6;
+      color: #191816;
+      font-weight: 600;
+    }
+
+    /* Micro Log Tile */
+    .microlog-card {
+      padding: 24px 26px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      gap: 16px;
+    }
+
+    .microlog-header-id {
+      display: inline-flex;
+      align-items: center;
+      gap: 9px;
+    }
+
+    .microlog-avatar-img {
+      width: 26px;
+      height: 26px;
+      border-radius: 50%;
+      object-fit: cover;
+      object-position: 50% 35%;
+      border: 1px solid var(--hairline-strong);
+      background: var(--bg-page);
+      flex-shrink: 0;
+    }
+
+    .microlog-list {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .microlog-item {
+      padding: 12px 0;
+      border-top: 1px solid var(--hairline);
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .microlog-item:first-child {
+      padding-top: 0;
+      border-top: 0;
+    }
+
+    .microlog-item:last-child {
+      padding-bottom: 0;
+    }
+
+    .microlog-meta {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+
+    .microlog-date {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--text-muted);
+      font-variant-numeric: tabular-nums;
+    }
+
+    .microlog-tag {
+      font-family: var(--font-mono);
+      font-size: 10.5px;
+      padding: 1px 8px;
+      border-radius: 980px;
+      background: var(--bg-subtle);
+      color: var(--text-secondary);
+    }
+
+    .microlog-text {
+      font-size: 13px;
+      line-height: 1.6;
+      color: var(--text-secondary);
+      text-autospace: normal;
+    }
+
+    /* ==================== ARCHIVE VIEW ==================== */
+    .archive-head {
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
+      gap: 20px;
+      flex-wrap: wrap;
+      margin-bottom: 20px;
+    }
+
+    .archive-h1 {
+      margin: 8px 0 6px;
+      font-family: var(--font-serif-display);
+      font-size: clamp(1.8rem, 3vw, 2.45rem);
+      font-weight: 600;
+    }
+
+    .archive-controls {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .search-wrap {
+      position: relative;
+      width: 260px;
+    }
+
+    .search-icon {
+      position: absolute;
+      left: 13px;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 15px;
+      height: 15px;
+      color: var(--text-muted);
+      pointer-events: none;
+    }
+
+    .search-input,
+    .sort-select {
+      background: var(--bg-surface);
+      border: 1px solid var(--hairline-strong);
+      border-radius: 980px;
+      font-size: 13px;
+      padding: 8px 14px;
+      color: var(--text-primary);
+    }
+
+    .search-input {
+      width: 100%;
+      padding-left: 36px;
+    }
+
+    .archive-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 20px;
+      margin-top: 22px;
+    }
+
+    .archive-card {
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      gap: 18px;
+    }
+
+    .archive-card-cover {
+      width: 100%;
+      aspect-ratio: 16 / 9;
+      max-height: 216px;
+      border-radius: 16px;
+      overflow: hidden;
+      border: 1px solid var(--hairline);
+      background: var(--bg-subtle);
+      margin-bottom: 4px;
+    }
+
+    .archive-card-cover img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      object-position: 50% 24%;
+      display: block;
+      transition: transform var(--dur-base) var(--ease-spring);
+    }
+
+    .archive-card:hover .archive-card-cover img {
+      transform: scale(1.04);
+    }
+
+    /* ==================== READER VIEW ==================== */
+    .reader-toolbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-bottom: 28px;
+    }
+
+    .reader-toolbar-group {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .reader-head-switcher {
+      padding: 3px;
+    }
+
+    .reader-head-switcher .capsule-seg-item {
+      font-size: 12px;
+      padding: 4px 11px;
+    }
+
+    .reader-mobile-toc-btn {
+      display: none;
+    }
+
+    .reader-mobile-toc-panel {
+      padding: 18px 20px;
+      margin-bottom: 22px;
+    }
+
+    .reader-header {
+      max-width: 820px;
+      margin: 0 auto 28px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .reader-h1 {
+      margin: 0;
+      font-family: var(--font-serif-display);
+      font-size: clamp(1.78rem, 3.2vw, 2.55rem);
+      font-weight: 600;
+      line-height: 1.24;
+      letter-spacing: -0.025em;
+      text-autospace: normal;
+    }
+
+    .reader-subtitle {
+      margin: 0;
+      font-size: 16px;
+      line-height: 1.72;
+      color: var(--text-secondary);
+      text-autospace: normal;
+    }
+
+    .reader-spec-line {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+
+    /* TL;DR Semantic Callout Card */
+    .callout-tldr {
+      max-width: 820px;
+      margin: 0 auto 22px;
+      padding: 18px 22px;
+      border-radius: 20px;
+      background: var(--bg-surface);
+      border: 1px solid var(--hairline-strong);
+      border-left: 3.5px solid var(--accent-primary);
+      box-shadow: var(--card-shadow);
+    }
+
+    .callout-tldr-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 10px;
+    }
+
+    .callout-tldr-list {
+      margin: 0;
+      padding-left: 1.25rem;
+      font-size: 14px;
+      line-height: 1.72;
+      color: var(--text-secondary);
+      text-autospace: normal;
+    }
+
+    .callout-tldr-list li {
+      margin-bottom: 4px;
+    }
+
+    .callout-tldr-list li:last-child {
+      margin-bottom: 0;
+    }
+
+    /* Reader Dynamic Head Frame */
+    .reader-head-frame {
+      max-width: 820px;
+      margin: 0 auto 18px;
+    }
+
+    .reader-artwork-wrap {
+      display: block;
+      padding: 0;
+      border-radius: 24px;
+      overflow: hidden;
+      border: 1px solid var(--hairline);
+      box-shadow: var(--card-shadow);
+      aspect-ratio: 16 / 9;
+      max-height: 410px;
+      width: 100%;
+      background: var(--bg-subtle);
+      cursor: zoom-in;
+    }
+
+    .reader-artwork-wrap img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      object-position: 50% 38%;
+      display: block;
+      transition: transform var(--dur-base) var(--ease-spring);
+    }
+
+    .reader-artwork-wrap:hover img {
+      transform: scale(1.02);
+    }
+
+    .reader-pure-divider {
+      height: 1px;
+      background: var(--hairline-strong);
+      margin: 8px 0 4px;
+    }
+
+    .boundary-callout {
+      max-width: 820px;
+      margin: 0 auto 28px;
+      padding: 11px 16px;
+      border-radius: 14px;
+      background: var(--bg-surface-secondary);
+      border: 1px solid var(--hairline);
+      font-size: 13px;
+      line-height: 1.65;
+      color: var(--text-secondary);
+      display: flex;
+      align-items: baseline;
+      gap: 10px;
+      text-autospace: normal;
+    }
+
+    .boundary-pill {
+      font-family: var(--font-mono);
+      font-size: 10.5px;
+      font-weight: 600;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      color: var(--accent-primary);
+      flex-shrink: 0;
+    }
+
+    /* Reader Body + Sticky TOC */
+    .reader-layout {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 256px;
+      gap: 30px;
+      align-items: start;
+    }
+
+    .reader-article-card {
+      padding: 40px 44px;
+    }
+
+    .reader-sidebar {
+      position: sticky;
+      top: 84px;
+      max-height: calc(100vh - 104px);
+      overflow-y: auto;
+      overscroll-behavior: contain;
+      padding-right: 4px;
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+    }
+
+    .toc-nav {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      margin-top: 10px;
+    }
+
+    .toc-link-btn {
+      width: 100%;
+      text-align: left;
+      padding: 6px 10px 6px 12px;
+      border-left: 2px solid var(--hairline);
+      font-size: 12.5px;
+      line-height: 1.45;
+      color: var(--text-muted);
+      transition: color var(--dur-fast) var(--ease-spring), border-color var(--dur-fast) var(--ease-spring);
+    }
+
+    .toc-link-btn:hover {
+      color: var(--text-primary);
+    }
+
+    .toc-link-btn.is-depth-3 {
+      padding-left: 24px;
+      font-size: 11.5px;
+    }
+
+    .toc-item-active {
+      color: var(--text-primary) !important;
+      border-left-color: var(--accent-primary) !important;
+      font-weight: 600;
+    }
+
+    .stepper-card {
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      border-radius: 22px;
+    }
+
+    .stepper-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+
+    /* ==================== STRESS-TESTED .blog-prose-container ==================== */
+    .blog-prose-container {
+      font-family: var(--reader-font-family);
+      font-size: var(--reader-font-size);
+      line-height: var(--reader-line-height);
+      max-width: var(--reader-max-width);
+      margin-left: auto;
+      margin-right: auto;
+      color: var(--text-primary);
+      text-autospace: normal;
+      text-spacing-trim: space-all;
+      hanging-punctuation: allow-end;
+      line-break: strict;
+      overflow-wrap: break-word;
+      transition:
+        font-size var(--dur-fast) var(--ease-spring),
+        line-height var(--dur-fast) var(--ease-spring),
+        max-width var(--dur-base) var(--ease-spring);
+    }
+
+    .blog-prose-container > section + section {
+      margin-top: 2.3em;
+    }
+
+    .blog-prose-container p {
+      margin-top: 0;
+      margin-bottom: 1.35em;
+      letter-spacing: 0.004em;
+    }
+
+    .blog-prose-container strong {
+      font-weight: 650;
+      color: var(--text-primary);
+    }
+
+    .blog-prose-container h2 {
+      font-family: var(--font-serif-display);
+      font-size: 1.44em;
+      font-weight: 650;
+      letter-spacing: -0.02em;
+      margin-top: 0.3em;
+      margin-bottom: 0.72em;
+      line-height: 1.32;
+      scroll-margin-top: 86px;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .blog-prose-container h3 {
+      font-size: 1.16em;
+      font-weight: 650;
+      letter-spacing: -0.015em;
+      margin-top: 1.75em;
+      margin-bottom: 0.58em;
+      line-height: 1.38;
+      scroll-margin-top: 86px;
+      color: var(--text-primary);
+    }
+
+    .blog-prose-container ul,
+    .blog-prose-container ol {
+      margin: 1em 0 1.45em;
+      padding-left: 1.48rem;
+    }
+
+    .blog-prose-container ul {
+      list-style-type: disc;
+    }
+
+    .blog-prose-container ol {
+      list-style-type: decimal;
+    }
+
+    .blog-prose-container ol > li::marker {
+      font-variant-numeric: tabular-nums;
+      color: var(--text-muted);
+      font-weight: 600;
+    }
+
+    .blog-prose-container li {
+      margin-bottom: 0.52em;
+    }
+
+    .blog-prose-container li > p:last-child {
+      margin-bottom: 0;
+    }
+
+    .blog-prose-container blockquote {
+      margin: 1.6em 0;
+      padding: 1.15rem 1.4rem;
+      border-radius: 16px;
+      background: var(--bg-surface-secondary);
+      border: 1px solid var(--hairline);
+      border-left: 3px solid var(--accent-primary);
+      color: var(--text-secondary);
+      font-weight: 500;
+    }
+
+    .blog-prose-container blockquote p:last-child {
+      margin-bottom: 0;
+    }
+
+    /* Inline Code (supports both bare <code> and .inline-code, wraps long paths safely) */
+    .blog-prose-container :not(pre) > code {
+      font-family: var(--font-mono);
+      font-size: 0.855em;
+      padding: 0.14em 0.42em;
+      border-radius: 6px;
+      background: var(--bg-subtle);
+      border: 1px solid var(--hairline);
+      color: var(--code-inline-fg);
+      overflow-wrap: anywhere;
+      word-break: break-word;
+    }
+
+    /* Links + Code inside Links */
+    .blog-prose-container a {
+      color: var(--accent-primary);
+      text-decoration: underline;
+      text-decoration-thickness: 1.5px;
+      text-underline-offset: 3px;
+      text-decoration-color: color-mix(in srgb, var(--accent-primary) 42%, transparent);
+      overflow-wrap: anywhere;
+      transition: color var(--dur-fast) var(--ease-spring), text-decoration-color var(--dur-fast) var(--ease-spring);
+    }
+
+    .blog-prose-container a:hover {
+      color: var(--accent-hover);
+      text-decoration-color: var(--accent-hover);
+    }
+
+    .blog-prose-container a > code {
+      color: inherit;
+      background: var(--accent-soft);
+      border-color: color-mix(in srgb, var(--accent-primary) 24%, transparent);
+    }
+
+    /* Horizontal Rules */
+    .blog-prose-container hr {
+      border: 0;
+      border-top: 1px solid var(--hairline-strong);
+      margin: 2.35em 0;
+    }
+
+    /* Scrollable Editorial Tables */
+    .blog-prose-container .table-scroll {
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+      border-radius: 16px;
+      border: 1px solid var(--hairline-strong);
+      background: var(--bg-surface-secondary);
+      margin: 1.6em 0;
+    }
+
+    .blog-prose-container table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.89em;
+      line-height: 1.6;
+      text-align: left;
+    }
+
+    .blog-prose-container thead th {
+      background: var(--bg-subtle);
+      font-weight: 600;
+      padding: 0.72em 0.95em;
+      border-bottom: 1px solid var(--hairline-strong);
+      white-space: nowrap;
+      color: var(--text-primary);
+    }
+
+    .blog-prose-container tbody td {
+      padding: 0.72em 0.95em;
+      border-bottom: 1px solid var(--hairline);
+      vertical-align: top;
+      color: var(--text-secondary);
+    }
+
+    .blog-prose-container tbody tr:last-child td {
+      border-bottom: 0;
+    }
+
+    .blog-prose-container tbody td:first-child {
+      font-variant-numeric: tabular-nums;
+      color: var(--text-primary);
+      font-weight: 500;
+    }
+
+    /* Code Figures (Decoupled from giant reader font sizes) */
+    .blog-prose-container .code-figure {
+      margin: 1.65em 0;
+      border-radius: 18px;
+      overflow: hidden;
+      background: var(--bg-code);
+      border: 1px solid rgba(255, 255, 255, 0.085);
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.14);
+    }
+
+    .blog-prose-container .code-figure-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 0.58rem 1rem;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      font-family: var(--font-mono);
+      font-size: 11.5px;
+      color: rgba(242, 239, 233, 0.65);
+    }
+
+    .blog-prose-container .code-lang {
+      font-weight: 500;
+      letter-spacing: 0.02em;
+      color: rgba(242, 239, 233, 0.82);
+    }
+
+    .blog-prose-container .code-copy-btn {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      padding: 4px 11px;
+      border-radius: 980px;
+      background: rgba(255, 255, 255, 0.10);
+      color: #f6f3ec;
+      transition: background-color var(--dur-fast) var(--ease-spring);
+    }
+
+    .blog-prose-container .code-copy-btn:hover {
+      background: rgba(255, 255, 255, 0.20);
+    }
+
+    .blog-prose-container .code-figure pre {
+      margin: 0;
+      padding: 1.05rem 1.25rem;
+      overflow-x: auto;
+      font-family: var(--font-mono);
+      font-size: clamp(12.5px, 0.82em, 14px);
+      line-height: 1.65;
+      color: #ece7df;
+      tab-size: 2;
+      white-space: pre;
+    }
+
+    .blog-prose-container .code-figure pre code {
+      font-family: inherit;
+      background: transparent;
+      border: 0;
+      padding: 0;
+      color: inherit;
+    }
+
+    .blog-prose-container .code-line-highlight {
+      display: inline;
+      background: rgba(224, 130, 99, 0.22);
+      box-shadow: -4px 0 0 var(--accent-primary), 6px 0 0 rgba(224, 130, 99, 0.22);
+      padding: 1px 0;
+      border-radius: 2px;
+      color: #ffffff;
+    }
+
+    /* Fact-Check Footnote & Prev/Next */
+    .reader-footnote-card {
+      max-width: var(--reader-max-width);
+      margin: 38px auto 0;
+      padding: 18px 20px;
+      border-radius: 18px;
+      background: var(--bg-surface-secondary);
+      border: 1px solid var(--hairline);
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .reader-footnote-text {
+      margin: 0;
+      font-size: 13px;
+      line-height: 1.68;
+      color: var(--text-secondary);
+      text-autospace: normal;
+    }
+
+    .reader-prev-next {
+      max-width: var(--reader-max-width);
+      margin: 26px auto 0;
+      padding-top: 24px;
+      border-top: 1px solid var(--hairline);
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 14px;
+    }
+
+    .prev-next-btn {
+      padding: 16px 18px;
+      border-radius: 18px;
+      background: var(--bg-subtle);
+      border: 1px solid var(--hairline);
+      text-align: left;
+      transition: background-color var(--dur-fast) var(--ease-spring);
+    }
+
+    .prev-next-btn:hover {
+      background: var(--bg-subtle-hover);
+    }
+
+    .prev-next-btn.is-next {
+      text-align: right;
+    }
+
+    .prev-next-title {
+      font-size: 13.5px;
+      font-weight: 600;
+      margin-top: 4px;
+      display: -webkit-box;
+      -webkit-line-clamp: 1;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+
+    /* ==================== FLOATING "Aa" CUSTOMIZER DRAWER ==================== */
+    .drawer-backdrop {
+      position: fixed;
+      inset: 0;
+      z-index: 60;
+      background: rgba(16, 14, 12, 0.34);
+      backdrop-filter: blur(4px);
+    }
+
+    .customizer-drawer {
+      position: fixed;
+      top: 12px;
+      right: 12px;
+      bottom: 12px;
+      z-index: 70;
+      width: calc(100% - 24px);
+      max-width: 376px;
+      border-radius: 26px;
+      background: var(--bg-sheet);
+      backdrop-filter: saturate(180%) blur(28px);
+      -webkit-backdrop-filter: saturate(180%) blur(28px);
+      border: 1px solid var(--hairline-strong);
+      box-shadow: 0 24px 60px rgba(0, 0, 0, 0.24);
+      padding: 22px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    .drawer-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding-bottom: 12px;
+      border-bottom: 1px solid var(--hairline);
+    }
+
+    .drawer-group {
+      display: flex;
+      flex-direction: column;
+      gap: 9px;
+    }
+
+    .drawer-grid-3 {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+    }
+
+    .drawer-grid-2 {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 8px;
+    }
+
+    .swatch-btn {
+      padding: 11px 8px;
+      border-radius: 16px;
+      border: 1px solid var(--hairline);
+      text-align: center;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 7px;
+      font-size: 12px;
+      font-weight: 500;
+      transition: background-color var(--dur-fast) var(--ease-spring);
+    }
+
+    .swatch-circle {
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      border: 1px solid var(--hairline-strong);
+    }
+
+    .font-card-btn {
+      padding: 11px 12px;
+      border-radius: 16px;
+      border: 1px solid var(--hairline);
+      text-align: left;
+      transition: background-color var(--dur-fast) var(--ease-spring);
+    }
+
+    .font-card-name {
+      font-size: 12.5px;
+      font-weight: 600;
+    }
+
+    .font-card-sub {
+      font-size: 11px;
+      color: var(--text-muted);
+      margin-top: 2px;
+    }
+
+    .slider-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 2px 4px;
+    }
+
+    input[type="range"].anime-slider {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 100%;
+      height: 5px;
+      border-radius: 999px;
+      background: var(--bg-subtle-hover);
+      outline: none;
+    }
+
+    input[type="range"].anime-slider::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      background: #ffffff;
+      border: 0.5px solid rgba(0, 0, 0, 0.16);
+      box-shadow: 0 3px 8px rgba(0, 0, 0, 0.2);
+      cursor: pointer;
+    }
+
+    .drawer-preview-box {
+      padding: 14px 16px;
+      border-radius: 16px;
+      background: var(--bg-subtle);
+      border: 1px solid var(--hairline);
+    }
+
+    .drawer-preview-text {
+      margin: 6px 0 0;
+      font-family: var(--reader-font-family);
+      font-size: var(--reader-font-size);
+      line-height: var(--reader-line-height);
+      text-autospace: normal;
+    }
+
+    .drawer-preview-text code {
+      font-family: var(--font-mono);
+      font-size: 0.855em;
+      padding: 0.1em 0.35em;
+      border-radius: 5px;
+      background: var(--bg-surface);
+      border: 1px solid var(--hairline);
+      color: var(--code-inline-fg);
+    }
+
+    /* Artwork Lightbox */
+    .artwork-lightbox {
+      position: fixed;
+      inset: 0;
+      z-index: 90;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+
+    .artwork-lightbox-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(12, 11, 10, 0.72);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+    }
+
+    .artwork-lightbox-panel {
+      position: relative;
+      z-index: 1;
+      width: min(880px, 100%);
+      max-height: 92vh;
+      overflow-y: auto;
+      border-radius: 24px;
+      background: var(--bg-sheet);
+      border: 1px solid var(--hairline-strong);
+      box-shadow: 0 28px 80px rgba(0, 0, 0, 0.45);
+      padding: 20px 22px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      animation: editorialStageIn var(--dur-fast) var(--ease-spring) both;
+    }
+
+    .artwork-lightbox-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .artwork-lightbox-title {
+      margin: 4px 0 0;
+      font-family: var(--font-serif-display);
+      font-size: 20px;
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+
+    .artwork-lightbox-media {
+      border-radius: 16px;
+      overflow: hidden;
+      background: var(--bg-code);
+      border: 1px solid var(--hairline);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .artwork-lightbox-media img {
+      width: 100%;
+      max-height: 70vh;
+      object-fit: contain;
+      display: block;
+    }
+
+    .artwork-lightbox-sub {
+      margin: 0;
+      font-size: 13.5px;
+      line-height: 1.65;
+      color: var(--text-secondary);
+    }
+
+    /* Toast */
+    .toast-container {
+      position: fixed;
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%) translateY(8px);
+      z-index: 95;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 220ms var(--ease-spring), transform 220ms var(--ease-spring);
+    }
+
+    .toast-container.is-visible {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
+
+    .toast-pill {
+      padding: 8px 16px;
+      border-radius: 980px;
+      background: var(--bg-sheet);
+      backdrop-filter: blur(20px);
+      border: 1px solid var(--hairline-strong);
+      box-shadow: 0 12px 32px rgba(0, 0, 0, 0.18);
+      font-size: 12.5px;
+      font-weight: 500;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    /* Footer */
+    .site-footer {
+      border-top: 1px solid var(--hairline);
+      padding: 28px 0 40px;
+      margin-top: 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 14px;
+      flex-wrap: wrap;
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+
+    .footer-links {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .footer-links button:hover {
+      color: var(--text-primary);
+      text-decoration: underline;
+    }
+
+    /* Scrollbar */
+    ::-webkit-scrollbar {
+      width: 7px;
+      height: 7px;
+    }
+    ::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: var(--hairline-strong);
+      border-radius: 999px;
+    }
+
+    /* ==================== RESPONSIVE BREAKPOINTS ==================== */
+    @media (max-width: 1220px) {
+      .home-hero-row {
+        grid-template-columns: 1fr;
+      }
+
+      .author-profile-card {
+        display: grid;
+        grid-template-columns: auto minmax(0, 1fr) 230px;
+        grid-template-areas:
+          "head head head"
+          "id bio foot";
+        align-items: center;
+        gap: 14px 22px;
+        padding: 20px 24px;
+      }
+
+      .profile-head-row {
+        grid-area: head;
+      }
+
+      .profile-identity-wrap {
+        grid-area: id;
+        min-width: 168px;
+      }
+
+      .profile-bio-section {
+        grid-area: bio;
+      }
+
+      .profile-bio {
+        text-align: left;
+      }
+
+      .profile-tags {
+        justify-content: flex-start;
+      }
+
+      .profile-footer {
+        grid-area: foot;
+        border-top: 0;
+        border-left: 1px solid var(--hairline);
+        padding-top: 0;
+        padding-left: 18px;
+      }
+    }
+
+    @media (max-width: 980px) {
+      .act-masthead,
+      .lead-monograph-card,
+      .editorial-post-row,
+      .act-interlude-grid,
+      .reader-layout {
+        grid-template-columns: 1fr;
+      }
+
+      .editorial-post-aside {
+        flex-direction: row;
+        align-items: center;
+        justify-content: space-between;
+        width: 100%;
+        padding-top: 12px;
+        border-top: 1px solid var(--hairline);
+      }
+
+      .reader-sidebar {
+        display: none;
+      }
+
+      .reader-mobile-toc-btn {
+        display: inline-flex;
+      }
+
+      .reader-article-card {
+        padding: 28px 24px;
+      }
+    }
+
+    @media (max-width: 760px) {
+      .hero-fable-stage {
+        padding: 20px 18px;
+        border-radius: 24px;
+      }
+
+      .hero-paper-sketch-img {
+        display: none;
+      }
+
+      .site-shell {
+        padding-left: 16px;
+        padding-right: 16px;
+      }
+
+      .desktop-nav,
+      .brand-author,
+      .quick-theme-text {
+        display: none;
+      }
+
+      .mobile-menu-btn {
+        display: inline-flex;
+      }
+
+      .archive-grid,
+      .reader-prev-next {
+        grid-template-columns: 1fr;
+      }
+
+      .search-wrap {
+        width: 100%;
+      }
+
+      .archive-controls {
+        width: 100%;
+      }
+
+      .lead-monograph-card,
+      .editorial-post-row {
+        padding: 20px;
+        gap: 16px;
+      }
+
+      .reader-article-card {
+        padding: 22px 18px;
+      }
+
+      .interlude-card {
+        min-height: 280px;
+      }
+    }
+
+    @media (max-width: 680px) {
+      .author-profile-card {
+        display: flex;
+        flex-direction: column;
+        align-items: stretch;
+        gap: 14px;
+        padding: 20px 18px;
+      }
+
+      .profile-identity-wrap {
+        min-width: 0;
+      }
+
+      .profile-footer {
+        border-left: 0;
+        border-top: 1px solid var(--hairline);
+        padding-left: 0;
+        padding-top: 12px;
+      }
+
+      .profile-bio {
+        text-align: center;
+      }
+
+      .profile-tags {
+        justify-content: center;
+      }
+
+      .masthead-actions-row .capsule-segmented,
+      .archive-controls .capsule-segmented {
+        border-radius: 16px;
+      }
+
+      .editorial-post-aside {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 12px;
+      }
+
+      .editorial-post-thumb {
+        width: 100%;
+        height: 164px;
+      }
+
+      .editorial-post-aside .card-footer-actions {
+        justify-content: flex-end;
+      }
+    }
+
+    @media (max-width: 480px) {
+      .masthead-companion-thumb-btn {
+        width: 64px;
+        height: 64px;
+      }
+
+      .masthead-companion-copy .eyebrow {
+        font-size: 10.5px;
+        letter-spacing: 0.06em;
+      }
+    }
+  </style>
+</head>
+<body data-theme="warm" data-motion="full">
+  <!-- Reading Progress Hairline -->
+  <div id="reading-progress-track">
+    <div id="reading-progress-bar"></div>
+  </div>
+
+  <!-- Subtle Optical Cross-Fade Veil -->
+  <div id="shutter-wipe" aria-hidden="true"></div>
+
+  <!-- Sticky Masthead -->
+  <header class="masthead">
+    <div class="site-shell masthead-inner">
+      <button type="button" id="brand-home-btn" class="brand-btn" aria-label="返回 Caramelized Notes 首页">
+        <div class="brand-mark" aria-hidden="true">
+          <img id="brand-avatar-img" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" alt="" class="brand-avatar-img" />
+        </div>
+        <div class="brand-text">
+          <span class="brand-title">Caramelized Notes</span>
+          <span class="brand-cn">· 焦糖笔记</span>
+          <span class="brand-author">by CaramelizedCUDA</span>
+        </div>
+      </button>
+
+      <nav class="capsule-segmented desktop-nav" aria-label="主导航">
+        <button type="button" data-nav="home" class="nav-tab capsule-seg-item">首页</button>
+        <button type="button" data-nav="blog" class="nav-tab capsule-seg-item">
+          <span>文章归档</span>
+          <span id="nav-post-count" class="nav-count-badge">3</span>
+        </button>
+        <button type="button" data-nav="reader" class="nav-tab capsule-seg-item">阅读</button>
+      </nav>
+
+      <div class="masthead-actions">
+        <button type="button" id="quick-theme-btn" class="editorial-pill-btn editorial-pill-secondary" title="切换焦糖和纸 / 暖炭暗夜 / 晴空昼白">
+          <span class="theme-dot" aria-hidden="true"></span>
+          <span id="quick-theme-label" class="quick-theme-text">焦糖和纸</span>
+        </button>
+
+        <button type="button" id="open-customizer-btn" class="editorial-pill-btn editorial-pill-primary hidden" title="阅读字体、字号与底纸设置">
+          <span style="font-family: var(--font-serif-display); font-weight: 600;">Aa</span>
+          <span>排版</span>
+        </button>
+
+        <button type="button" id="mobile-menu-btn" class="editorial-pill-btn editorial-pill-secondary mobile-menu-btn" aria-label="展开导航菜单">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+            <path stroke-linecap="round" d="M4 7h16M4 12h16M4 17h16" />
+          </svg>
+        </button>
+      </div>
+    </div>
+
+    <div id="mobile-nav-panel" class="hidden mobile-nav-panel">
+      <button type="button" data-nav="home" class="nav-tab capsule-seg-item">首页</button>
+      <button type="button" data-nav="blog" class="nav-tab capsule-seg-item">文章归档</button>
+      <button type="button" data-nav="reader" class="nav-tab capsule-seg-item">阅读</button>
+    </div>
+  </header>
+
+  <main class="site-shell main-canvas">
+    <!-- ==================== VIEW 1: HOME ==================== -->
+    <section id="view-home" class="home-stack animate-stage">
+      <!-- Act 1: Hero Row (Fable Paper Stage + Author Profile Card) -->
+      <div class="home-hero-row">
+        <div class="hero-fable-stage">
+          <div class="hero-fable-backdrop" aria-hidden="true">
+          <img
+            id="hero-fable-bg-img"
+            src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"
+            alt=""
+            class="hero-fable-bg-img"
+          />
+          <img
+            id="hero-paper-sketch-img"
+            src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"
+            alt=""
+            class="hero-paper-sketch-img"
+          />
+        </div>
+
+        <div class="act-masthead">
+          <div class="masthead-manifesto">
+            <div>
+              <div class="eyebrow">PERSONAL BLOG &amp; DIGITAL GARDEN · CARAMELIZED NOTES</div>
+              <h1 class="manifesto-h1">在深入研究与动手构建之间，留存值得反复翻阅的笔记。</h1>
+              <p class="manifesto-lead">
+                这里遵循「研究 → 总结 → 发布」的日常习惯，记录底层系统与工程实践、架构与工具拆解、设计审美思考，以及案头的阅读与生活随笔。
+              </p>
+            </div>
+
+            <div class="masthead-actions-row">
+              <div class="capsule-segmented" id="home-category-pills" role="group" aria-label="栏目筛选">
+                <button type="button" data-cat="all" class="home-cat-btn capsule-seg-item">全部</button>
+                <button type="button" data-cat="engineering" class="home-cat-btn capsule-seg-item">工程与系统</button>
+                <button type="button" data-cat="architecture" class="home-cat-btn capsule-seg-item">架构与工具</button>
+                <button type="button" data-cat="essays" class="home-cat-btn capsule-seg-item">设计与随笔</button>
+              </div>
+              <button type="button" id="hero-fable-preview-btn" class="editorial-pill-btn editorial-pill-secondary hero-fable-preview-btn" aria-label="展开查看卷首纸面画卷">
+                <span aria-hidden="true">✦</span>
+                <span>卷首画卷 · 展开</span>
+              </button>
+            </div>
+          </div>
+
+          <aside class="bento-tile axioms-card" aria-label="写作脉络">
+            <div class="axioms-rhythm-head">
+              <span class="eyebrow">Writing Rhythm · 研究 → 总结 → 发布</span>
+              <span class="mono axioms-rhythm-since">Since 2026</span>
+            </div>
+            <ul class="axioms-list">
+              <li class="axiom-item">
+                <span class="axiom-num">01</span>
+                <div>
+                  <div class="axiom-title">研究 · Explore</div>
+                  <div class="axiom-desc">顺着问题往下一层追，不止步于“能跑就行”的表面绕过，摸清系统与设计的真实边界。</div>
+                </div>
+              </li>
+              <li class="axiom-item">
+                <span class="axiom-num">02</span>
+                <div>
+                  <div class="axiom-title">总结 · Distill</div>
+                  <div class="axiom-desc">把零散的实验、排障过程与审美观察，提炼成结构清晰、可复核的心智模型与笔记。</div>
+                </div>
+              </li>
+              <li class="axiom-item">
+                <span class="axiom-num">03</span>
+                <div>
+                  <div class="axiom-title">发布 · Share</div>
+                  <div class="axiom-desc">以克制、诚实的文字公开记录，在持续写作中沉淀长期作品。</div>
+                </div>
+              </li>
+            </ul>
+          </aside>
+        </div>
+        </div>
+
+        <aside class="bento-tile bento-sheen author-profile-card" aria-label="个人名片">
+          <div class="profile-head-row">
+            <span class="eyebrow">AUTHOR · 个人名片</span>
+            <span class="profile-exlibris">Ex Libris · 2026</span>
+          </div>
+
+          <div class="profile-identity-wrap">
+            <button type="button" id="profile-avatar-trigger" class="profile-avatar-btn" aria-label="放大查看 CaramelizedCUDA 个人头像">
+              <img
+                id="profile-avatar-img"
+                src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"
+                alt="CaramelizedCUDA 头像"
+                class="profile-avatar-img"
+              />
+            </button>
+            <h2 class="profile-name display-serif">CaramelizedCUDA</h2>
+            <div class="profile-role">焦糖笔记 · 独立作者与构建者</div>
+          </div>
+
+          <div class="profile-bio-section">
+            <p class="profile-bio">与AI一起探索和记录虚拟世界的点点滴滴~</p>
+            <div class="profile-tags" aria-label="关注领域">
+              <span class="profile-tag">Systems</span>
+              <span class="profile-tag">Rust</span>
+              <span class="profile-tag">Node.js</span>
+              <span class="profile-tag">AI Agent</span>
+            </div>
+          </div>
+
+          <div class="profile-footer">
+            <div class="profile-stats-line">
+              <span id="profile-post-count">3</span> 篇长文 · <span id="profile-note-count">4</span> 则短记
+            </div>
+            <div class="profile-actions-row">
+              <a
+                href="https://github.com/CaramelizedCUDA"
+                target="_blank"
+                rel="noopener noreferrer"
+                class="editorial-pill-btn editorial-pill-secondary profile-action-link"
+              >
+                <span>GitHub · @CaramelizedCUDA</span>
+                <span aria-hidden="true">↗</span>
+              </a>
+            </div>
+          </div>
+        </aside>
+      </div>
+
+      <!-- Act 2: Featured Article -->
+      <div id="home-lead-section">
+        <div class="section-head-row">
+          <h2 class="section-title">近期主打</h2>
+          <button type="button" id="home-go-archive-top" class="editorial-pill-btn editorial-pill-secondary">
+            <span>浏览全部文章</span>
+            <span aria-hidden="true">→</span>
+          </button>
+        </div>
+        <div id="home-lead-slot"></div>
+      </div>
+
+      <!-- Act 3: Latest Articles List -->
+      <div id="home-stream-section">
+        <div class="section-head-row">
+          <h2 class="section-title">最新文章</h2>
+        </div>
+        <div id="home-stream-list" class="editorial-post-list"></div>
+      </div>
+
+      <!-- Act 4: Visual Corner & Notes -->
+      <div id="home-interlude-section">
+        <div class="section-head-row">
+          <h2 class="section-title">光影与短记</h2>
+        </div>
+        <div class="act-interlude-grid">
+          <div class="interlude-card">
+            <img
+              id="interlude-banner-img"
+              src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"
+              alt="案头光影插画"
+              class="interlude-img"
+            />
+            <div class="interlude-scrim"></div>
+            <canvas id="hero-particles" aria-hidden="true"></canvas>
+
+            <div class="interlude-top">
+              <span class="interlude-badge">
+                <span class="theme-dot" aria-hidden="true"></span>
+                <span>VISUAL CORNER · 光影画匣</span>
+              </span>
+              <button type="button" id="interlude-zoom-btn" class="interlude-zoom-btn" aria-label="查看大图预览">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7" />
+                </svg>
+                <span>查看原画</span>
+              </button>
+            </div>
+
+            <div class="interlude-bottom">
+              <div>
+                <h3 id="interlude-title" class="interlude-caption-title">海列车的午后</h3>
+                <p id="interlude-sub" class="interlude-caption-sub">窗外掠过晴空与海面，手边是一杯热咖啡与摊开的笔记。</p>
+              </div>
+              <div class="interlude-tabs" role="group" aria-label="切换画幅">
+                <button type="button" data-interlude="windowStudy" class="interlude-tab-btn is-active">海列车的午后</button>
+                <button type="button" data-interlude="starryRipple" class="interlude-tab-btn">星海微澜</button>
+                <button type="button" data-interlude="sunlitStreet" class="interlude-tab-btn">晴街绣球</button>
+                <button type="button" data-interlude="lanternReading" class="interlude-tab-btn">暖灯夜读</button>
+              </div>
+            </div>
+          </div>
+
+          <aside class="bento-tile microlog-card" aria-label="案头短记">
+            <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px;">
+              <div class="microlog-header-id">
+                <img
+                  id="microlog-avatar-img"
+                  src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"
+                  alt=""
+                  class="microlog-avatar-img"
+                />
+                <span class="eyebrow">NOTES · 案头短记</span>
+              </div>
+              <span class="mono" style="font-size: 11px; color: var(--text-muted);">2026</span>
+            </div>
+            <div class="masthead-companion">
+              <button type="button" id="masthead-companion-trigger" class="masthead-companion-thumb-btn" aria-label="放大查看夜猫子案头插画">
+                <img
+                  id="masthead-companion-img"
+                  src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"
+                  alt="夜猫子案头插画"
+                  class="masthead-companion-img"
+                />
+              </button>
+              <div class="masthead-companion-copy">
+                <div class="eyebrow" style="color: var(--accent-primary);">NIGHT OWL NOTES · 深夜案头</div>
+                <div class="masthead-companion-title">案头拾零与夜读时间</div>
+                <div class="masthead-companion-sub">白日研究系统与工具链，深夜随手记下案头的吉光片羽。</div>
+              </div>
+            </div>
+            <div id="home-microlog-list" class="microlog-list"></div>
+          </aside>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================== VIEW 2: ARCHIVE ==================== -->
+    <section id="view-blog" class="hidden animate-stage">
+      <div class="archive-head">
+        <div>
+          <div class="eyebrow">ARCHIVE · ALL NOTES</div>
+          <h1 class="archive-h1">文章归档</h1>
+          <p style="margin: 0; font-size: 14px; color: var(--text-secondary);">
+            按主题或关键词检索已发布的文章、技术笔记与随笔。
+          </p>
+        </div>
+
+        <div class="archive-controls">
+          <div class="search-wrap">
+            <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+              <circle cx="11" cy="11" r="7"></circle>
+              <path stroke-linecap="round" d="M20 20l-3.8-3.8"></path>
+            </svg>
+            <input type="search" id="blog-search-input" class="search-input" placeholder="检索标题、标签或正文关键词..." />
+          </div>
+
+          <select id="blog-sort-select" class="sort-select" aria-label="排序方式">
+            <option value="latest">最新优先</option>
+            <option value="short">短篇快读优先</option>
+            <option value="saved">已收藏优先</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="capsule-segmented" role="group" aria-label="归档分类筛选">
+        <button type="button" data-archive-cat="all" class="archive-cat-btn capsule-seg-item">全部文章</button>
+        <button type="button" data-archive-cat="engineering" class="archive-cat-btn capsule-seg-item">工程与系统</button>
+        <button type="button" data-archive-cat="architecture" class="archive-cat-btn capsule-seg-item">架构与工具</button>
+        <button type="button" data-archive-cat="essays" class="archive-cat-btn capsule-seg-item">设计与随笔</button>
+        <button type="button" data-archive-cat="saved" class="archive-cat-btn capsule-seg-item">
+          <span>已收藏</span>
+          <span id="saved-count-badge" class="nav-count-badge">0</span>
+        </button>
+      </div>
+
+      <div id="archive-post-grid" class="archive-grid"></div>
+    </section>
+
+    <!-- ==================== VIEW 3: READER ==================== -->
+    <section id="view-reader" class="hidden animate-stage">
+      <div class="reader-toolbar">
+        <div class="reader-toolbar-group">
+          <button type="button" id="reader-back-blog-btn" class="editorial-pill-btn editorial-pill-secondary">← 返回文章归档</button>
+          <button type="button" id="reader-mobile-toc-btn" class="editorial-pill-btn editorial-pill-secondary reader-mobile-toc-btn">目录大纲</button>
+        </div>
+
+        <div class="reader-toolbar-group">
+          <div class="capsule-segmented reader-head-switcher" role="group" aria-label="文章头图模式切换">
+            <button type="button" data-head-mode="specimen" class="head-mode-btn capsule-seg-item">关键切面</button>
+            <button type="button" data-head-mode="artwork" class="head-mode-btn capsule-seg-item">主题插画</button>
+            <button type="button" data-head-mode="none" class="head-mode-btn capsule-seg-item">纯净无图</button>
+          </div>
+
+          <button type="button" id="reader-bookmark-btn" class="editorial-pill-btn editorial-pill-secondary">
+            <span id="reader-bookmark-icon">☆</span>
+            <span id="reader-bookmark-label">收藏备忘</span>
+          </button>
+
+          <button type="button" id="reader-customizer-btn" class="editorial-pill-btn editorial-pill-primary">
+            <span style="font-family: var(--font-serif-display); font-weight: 600;">Aa</span>
+            <span>排版与底纸</span>
+          </button>
+        </div>
+      </div>
+
+      <div id="reader-mobile-toc-panel" class="hidden bento-tile reader-mobile-toc-panel">
+        <div class="eyebrow" style="margin-bottom: 8px;">On This Page · 章节目录</div>
+        <div id="reader-mobile-toc-links" class="toc-nav"></div>
+      </div>
+
+      <header class="reader-header">
+        <div class="meta-line">
+          <span id="reader-issue-badge" class="meta-issue">ISSUE 01</span>
+          <span id="reader-cat-badge" style="color: var(--accent-primary); font-weight: 600;">工程与系统</span>
+          <span>·</span>
+          <span id="reader-date" class="tabular-nums">2026-11-11</span>
+          <span id="reader-updated" class="hidden tabular-nums"></span>
+          <span>·</span>
+          <span id="reader-readtime" class="tabular-nums">约 7 分钟</span>
+        </div>
+
+        <h1 id="reader-title" class="reader-h1">文章标题</h1>
+        <p id="reader-subtitle" class="reader-subtitle"></p>
+
+        <div style="display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap;">
+          <div id="reader-tags-row" class="tag-row" style="margin-top: 0;"></div>
+          <span id="reader-live-spec" class="reader-spec-line">现代黑体 · 17px · 行高 1.85 · 740px</span>
+        </div>
+      </header>
+
+      <div id="reader-tldr-box" class="callout-tldr">
+        <div class="callout-tldr-head">
+          <span class="eyebrow" style="color: var(--accent-primary);">TL;DR · 要点速览</span>
+          <span class="mono" style="font-size: 11px; color: var(--text-muted);">30s Summary</span>
+        </div>
+        <ul id="reader-tldr-list" class="callout-tldr-list"></ul>
+      </div>
+
+      <div id="reader-head-frame" class="reader-head-frame"></div>
+
+      <div id="reader-boundary-box" class="boundary-callout">
+        <span class="boundary-pill">Boundary</span>
+        <span id="reader-boundary-text"></span>
+      </div>
+
+      <div class="reader-layout">
+        <article class="bento-tile reader-article-card">
+          <div id="reader-prose-body" class="blog-prose-container"></div>
+
+          <div id="reader-footnote-box" class="reader-footnote-card">
+            <span class="eyebrow">Verification &amp; Environment · 环境与核验说明</span>
+            <p id="reader-footnote-text" class="reader-footnote-text"></p>
+          </div>
+
+          <div id="reader-prev-next" class="reader-prev-next"></div>
+        </article>
+
+        <aside class="reader-sidebar">
+          <div style="padding-left: 2px;">
+            <div style="display: flex; align-items: center; justify-content: space-between;">
+              <span class="eyebrow">章节导览</span>
+              <span id="toc-progress-pct" class="mono tabular-nums" style="font-size: 11.5px; color: var(--text-muted);">0%</span>
+            </div>
+            <nav id="reader-desktop-toc" class="toc-nav" aria-label="文章章节导航"></nav>
+          </div>
+
+          <div class="bento-tile stepper-card">
+            <div class="eyebrow">字号微调 (15–21px)</div>
+            <div class="stepper-row">
+              <button type="button" id="toc-font-dec" class="editorial-pill-btn editorial-pill-secondary mono" style="padding: 5px 12px;">A-</button>
+              <span id="toc-font-val" class="mono tabular-nums" style="font-size: 12.5px; font-weight: 600;">17px</span>
+              <button type="button" id="toc-font-inc" class="editorial-pill-btn editorial-pill-secondary mono" style="padding: 5px 12px;">A+</button>
+            </div>
+            <button type="button" id="toc-scroll-top" class="editorial-pill-btn editorial-pill-secondary" style="width: 100%;">↑ 回到顶部</button>
+          </div>
+        </aside>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-shell site-footer">
+    <div>Caramelized Notes · 焦糖笔记 — CaramelizedCUDA</div>
+    <div class="footer-links">
+      <button type="button" id="footer-go-home">首页</button>
+      <button type="button" id="footer-go-blog">文章归档</button>
+      <button type="button" id="footer-scroll-top">回到顶部</button>
+    </div>
+  </footer>
+
+  <!-- Floating "Aa" Customizer Drawer -->
+  <div id="customizer-backdrop" class="hidden drawer-backdrop"></div>
+  <aside id="customizer-drawer" class="hidden customizer-drawer" aria-label="阅读排版与外观调节面板">
+    <div class="drawer-head">
+      <div>
+        <div class="eyebrow">Typography</div>
+        <div style="font-size: 15.5px; font-weight: 600; margin-top: 2px;">阅读外观与排版偏好</div>
+      </div>
+      <button type="button" id="close-customizer-btn" class="editorial-circle-action" aria-label="关闭面板">✕</button>
+    </div>
+
+    <div class="drawer-group">
+      <span class="eyebrow">底纸主题</span>
+      <div class="drawer-grid-3">
+        <button type="button" data-drawer-theme="warm" class="drawer-theme-btn swatch-btn">
+          <span class="swatch-circle" style="background: #f6f3ec;"></span>
+          <span>焦糖和纸</span>
+        </button>
+        <button type="button" data-drawer-theme="night" class="drawer-theme-btn swatch-btn">
+          <span class="swatch-circle" style="background: #1b1a18;"></span>
+          <span>暖炭暗夜</span>
+        </button>
+        <button type="button" data-drawer-theme="daylight" class="drawer-theme-btn swatch-btn">
+          <span class="swatch-circle" style="background: #f5f5f7;"></span>
+          <span>晴空昼白</span>
+        </button>
+      </div>
+    </div>
+
+    <div class="drawer-group">
+      <span class="eyebrow">正文字体</span>
+      <div class="drawer-grid-2">
+        <button type="button" data-set-font="sans" class="font-opt-btn font-card-btn">
+          <div class="font-card-name">现代黑体</div>
+          <div class="font-card-sub">系统无衬线体</div>
+        </button>
+        <button type="button" data-set-font="serif" class="font-opt-btn font-card-btn" style="font-family: var(--font-serif-display);">
+          <div class="font-card-name">人文衬线</div>
+          <div class="font-card-sub">Newsreader / 宋体</div>
+        </button>
+        <button type="button" data-set-font="kai" class="font-opt-btn font-card-btn" style="font-family: 'LXGW WenKai', 'Kaiti SC', 'STKaiti', serif;">
+          <div class="font-card-name">温润楷书</div>
+          <div class="font-card-sub">文楷 / 系统楷体</div>
+        </button>
+        <button type="button" data-set-font="mono" class="font-opt-btn font-card-btn" style="font-family: var(--font-mono);">
+          <div class="font-card-name">极客手记</div>
+          <div class="font-card-sub">JetBrains Mono 等宽</div>
+        </button>
+      </div>
+    </div>
+
+    <div class="drawer-group">
+      <div style="display: flex; align-items: center; justify-content: space-between;">
+        <span class="eyebrow">正文字号 (15–21px)</span>
+        <span id="drawer-fontsize-badge" class="mono tabular-nums" style="font-size: 12px; font-weight: 600; color: var(--accent-primary);">17px (推荐)</span>
+      </div>
+      <div class="slider-row">
+        <span style="font-size: 12px; color: var(--text-muted);">A</span>
+        <input type="range" id="drawer-fontsize-slider" min="15" max="21" step="1" value="17" class="anime-slider" aria-label="正文字号调节" />
+        <span style="font-size: 16px; font-weight: 600;">A</span>
+      </div>
+    </div>
+
+    <div class="drawer-group">
+      <span class="eyebrow">行距呼吸感</span>
+      <div class="capsule-segmented" style="display: grid; grid-template-columns: repeat(3, 1fr);">
+        <button type="button" data-set-lh="1.65" class="lh-opt-btn capsule-seg-item" style="justify-content: center;">紧凑 1.65</button>
+        <button type="button" data-set-lh="1.85" class="lh-opt-btn capsule-seg-item" style="justify-content: center;">舒适 1.85</button>
+        <button type="button" data-set-lh="2.1" class="lh-opt-btn capsule-seg-item" style="justify-content: center;">疏朗 2.10</button>
+      </div>
+    </div>
+
+    <div class="drawer-group">
+      <span class="eyebrow">正文版心宽度</span>
+      <div class="capsule-segmented" style="display: grid; grid-template-columns: repeat(3, 1fr);">
+        <button type="button" data-set-width="640" class="width-opt-btn capsule-seg-item" style="justify-content: center;">专注 640</button>
+        <button type="button" data-set-width="740" class="width-opt-btn capsule-seg-item" style="justify-content: center;">均衡 740</button>
+        <button type="button" data-set-width="880" class="width-opt-btn capsule-seg-item" style="justify-content: center;">舒展 880</button>
+      </div>
+    </div>
+
+    <div class="drawer-group">
+      <span class="eyebrow">动效强度</span>
+      <div class="capsule-segmented" style="display: grid; grid-template-columns: repeat(3, 1fr);">
+        <button type="button" data-set-motion="full" class="motion-opt-btn capsule-seg-item" style="justify-content: center;">灵动</button>
+        <button type="button" data-set-motion="subtle" class="motion-opt-btn capsule-seg-item" style="justify-content: center;">克制</button>
+        <button type="button" data-set-motion="none" class="motion-opt-btn capsule-seg-item" style="justify-content: center;">静态</button>
+      </div>
+    </div>
+
+    <div class="drawer-preview-box">
+      <div class="eyebrow">排版预览</div>
+      <p class="drawer-preview-text">问题不在 <code>ENOENT</code> 是否存在，而在 <code>existsSync()</code> 把 <code>D:\AI-Dev\devin</code> 目录当成了可执行文件。</p>
+    </div>
+
+    <div style="display: flex; gap: 8px; padding-top: 2px;">
+      <button type="button" id="drawer-jump-reader-btn" class="editorial-pill-btn editorial-pill-primary" style="flex: 1; padding: 9px 14px;">完成设置</button>
+      <button type="button" id="drawer-reset-prefs-btn" class="editorial-pill-btn editorial-pill-secondary">恢复推荐</button>
+    </div>
+  </aside>
+
+  <!-- Artwork Lightbox Modal -->
+  <div id="artwork-lightbox" class="hidden artwork-lightbox" role="dialog" aria-modal="true" aria-labelledby="lightbox-title">
+    <div id="lightbox-backdrop" class="artwork-lightbox-backdrop"></div>
+    <div class="artwork-lightbox-panel">
+      <div class="artwork-lightbox-head">
+        <div>
+          <div id="lightbox-eyebrow" class="eyebrow">VISUAL CORNER · 光影画匣</div>
+          <h3 id="lightbox-title" class="artwork-lightbox-title">插画预览</h3>
+        </div>
+        <button type="button" id="close-lightbox-btn" class="editorial-circle-action" aria-label="关闭大图预览">✕</button>
+      </div>
+      <div class="artwork-lightbox-media">
+        <img id="lightbox-img" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" alt="" />
+      </div>
+      <p id="lightbox-sub" class="artwork-lightbox-sub"></p>
+    </div>
+  </div>
+
+  <!-- Toast -->
+  <div id="toast-container" class="toast-container" role="status" aria-live="polite">
+    <div class="toast-pill">
+      <span class="theme-dot" aria-hidden="true"></span>
+      <span id="toast-msg">已更新</span>
+    </div>
+  </div>
+
+  <script>
+    (function () {
+      'use strict';
+
+      /* __INJECT_IMAGES_DATA__ */
+      /* __INJECT_ARTICLES_DATA__ */
+
+      const INTERLUDE_SCENES = {
+        windowStudy: {
+          label: '海列车的午后',
+          sub: '窗外掠过晴空与海面，手边是一杯热咖啡与摊开的笔记。',
+          src: IMAGES.windowStudy
+        },
+        starryRipple: {
+          label: '星海微澜',
+          sub: '深夜收工后的静谧时刻，让思绪在星光与水波里慢下来。',
+          src: IMAGES.starryRipple
+        },
+        sunlitStreet: {
+          label: '晴街绣球',
+          sub: '走出终端与编译器，去午后的街角晒一会儿太阳。',
+          src: IMAGES.sunlitStreet
+        },
+        lanternReading: {
+          label: '暖灯夜读',
+          sub: '煤油灯与热茶相伴的案头一角，留给睡前的随手短记。',
+          src: IMAGES.lanternReading
+        }
+      };
+
+      const FONT_MAP = {
+        sans: {
+          label: '现代黑体',
+          css: "-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei UI', 'Segoe UI', 'Noto Sans SC', sans-serif"
+        },
+        serif: {
+          label: '人文衬线',
+          css: "'Newsreader', 'Songti SC', 'STSong', 'Noto Serif SC', Georgia, serif"
+        },
+        kai: {
+          label: '温润楷书',
+          css: "'LXGW WenKai', 'Kaiti SC', 'STKaiti', 'KaiTi', Georgia, serif"
+        },
+        mono: {
+          label: '极客手记',
+          css: "'JetBrains Mono', ui-monospace, 'Cascadia Mono', 'SFMono-Regular', 'PingFang SC', 'Microsoft YaHei UI', monospace"
+        }
+      };
+
+      const THEME_META = {
+        warm: { label: '焦糖和纸' },
+        night: { label: '暖炭暗夜' },
+        daylight: { label: '晴空昼白' }
+      };
+
+      const MOTION_META = {
+        full: '灵动',
+        subtle: '克制',
+        none: '静态'
+      };
+
+      const DEFAULT_PREFS = {
+        theme: 'warm',
+        fontFamily: 'sans',
+        fontSize: 17,
+        lineHeight: '1.85',
+        contentWidth: '740',
+        motionLevel: 'full',
+        headMode: 'specimen'
+      };
+
+      const state = {
+        activeView: 'home',
+        activePostId: BLOG_POSTS[0] ? BLOG_POSTS[0].id : '',
+        homeCategory: 'all',
+        archiveCategory: 'all',
+        searchQuery: '',
+        sortBy: 'latest',
+        interludeKey: 'windowStudy',
+        customizerOpen: false,
+        lightboxOpen: false,
+        lightboxTriggerEl: null,
+        mobileMenuOpen: false,
+        mobileTocOpen: false,
+        activeHeadings: [],
+        prefs: Object.assign({}, DEFAULT_PREFS),
+        bookmarks: {}
+      };
+
+      function loadSavedState() {
+        try {
+          const rawPrefs = localStorage.getItem('caramelized_notes_prefs_v1');
+          if (rawPrefs) {
+            const parsed = JSON.parse(rawPrefs);
+            if (parsed && typeof parsed === 'object') {
+              if (THEME_META[parsed.theme]) state.prefs.theme = parsed.theme;
+              if (FONT_MAP[parsed.fontFamily]) state.prefs.fontFamily = parsed.fontFamily;
+              const sz = Number(parsed.fontSize);
+              if (!isNaN(sz) && sz >= 15 && sz <= 21) state.prefs.fontSize = Math.round(sz);
+              if (['1.65', '1.85', '2.1'].includes(String(parsed.lineHeight))) state.prefs.lineHeight = String(parsed.lineHeight);
+              if (['640', '740', '880'].includes(String(parsed.contentWidth))) state.prefs.contentWidth = String(parsed.contentWidth);
+              if (MOTION_META[parsed.motionLevel]) state.prefs.motionLevel = parsed.motionLevel;
+              if (['specimen', 'artwork', 'none'].includes(parsed.headMode)) state.prefs.headMode = parsed.headMode;
+            }
+          }
+          const rawBookmarks = localStorage.getItem('caramelized_notes_bookmarks_v1');
+          if (rawBookmarks) {
+            const b = JSON.parse(rawBookmarks);
+            if (b && typeof b === 'object') state.bookmarks = b;
+          }
+        } catch (err) {
+          // Safe fallback when storage is unavailable
+        }
+      }
+
+      function savePrefs() {
+        try {
+          localStorage.setItem('caramelized_notes_prefs_v1', JSON.stringify(state.prefs));
+          localStorage.setItem('caramelized_notes_bookmarks_v1', JSON.stringify(state.bookmarks));
+        } catch (err) {
+          // Safe fallback
+        }
+      }
+
+      let toastTimer = null;
+      function showToast(msg) {
+        const container = document.getElementById('toast-container');
+        const msgEl = document.getElementById('toast-msg');
+        if (!container || !msgEl) return;
+        msgEl.textContent = msg;
+        container.classList.add('is-visible');
+        if (toastTimer) clearTimeout(toastTimer);
+        toastTimer = setTimeout(function () {
+          container.classList.remove('is-visible');
+        }, 2000);
+      }
+
+      function escapeHtml(str) {
+        return String(str == null ? '' : str)
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;');
+      }
+
+      function decodeHtmlEntities(str) {
+        return String(str || '').replace(/&(#x?[0-9a-fA-F]+|[a-zA-Z]+);/g, function (match, entity) {
+          const lower = entity.toLowerCase();
+          if (lower === 'amp') return '&';
+          if (lower === 'lt') return '<';
+          if (lower === 'gt') return '>';
+          if (lower === 'quot') return '"';
+          if (lower === 'apos') return "'";
+          if (lower === 'nbsp') return ' ';
+          if (entity.charAt(0) === '#') {
+            const isHex = lower.charAt(1) === 'x';
+            const code = parseInt(isHex ? entity.slice(2) : entity.slice(1), isHex ? 16 : 10);
+            if (!isNaN(code) && code > 0 && code <= 0x10ffff) {
+              return String.fromCodePoint(code);
+            }
+          }
+          return match;
+        });
+      }
+
+      function stripHtml(html) {
+        const noTags = String(html || '').replace(/<[^>]+>/g, ' ');
+        return decodeHtmlEntities(noTags).replace(/\s+/g, ' ').trim();
+      }
+
+      function renderKeyTakeawayHtml(post) {
+        const tldrItems = Array.isArray(post.tldr) ? post.tldr.slice(0, 3) : [];
+        const bulletsHtml = tldrItems.length
+          ? '<ul class="takeaway-bullets">' + tldrItems.map(function (item) {
+              return '<li>' + escapeHtml(item) + '</li>';
+            }).join('') + '</ul>'
+          : '';
+
+        const specimen = post.specimen;
+        let snippetHtml = '';
+        let proofHtml = '';
+        if (specimen) {
+          const lines = Array.isArray(specimen.lines) ? specimen.lines.slice(0, 3) : [];
+          if (lines.length) {
+            snippetHtml =
+              '<div class="takeaway-snippet">' +
+                lines.map(function (line) {
+                  const t = line.type === 'del' ? 'del' : (line.type === 'ins' ? 'ins' : 'ctx');
+                  const prefix = t === 'del' ? '-' : (t === 'ins' ? '+' : ' ');
+                  return (
+                    '<div class="specimen-line specimen-line-' + t + '">' +
+                      '<span class="specimen-prefix">' + prefix + '</span>' +
+                      '<span>' + escapeHtml(line.text) + '</span>' +
+                    '</div>'
+                  );
+                }).join('') +
+              '</div>';
+          }
+          if (specimen.proof) {
+            proofHtml = '<div class="takeaway-proof">' + escapeHtml(specimen.proof) + '</div>';
+          }
+        } else if (post.boundaryNote) {
+          proofHtml = '<div class="takeaway-proof">' + escapeHtml(post.boundaryNote) + '</div>';
+        }
+
+        const eyebrowText = specimen && specimen.eyebrow ? specimen.eyebrow : 'Key Takeaway · 核心摘要';
+        const titleText = specimen && specimen.title ? specimen.title : '核心切面与要点';
+
+        return (
+          '<aside class="takeaway-panel" aria-label="核心切面与要点">' +
+            '<div>' +
+              '<div class="takeaway-head">' +
+                '<span class="takeaway-eyebrow">' + escapeHtml(eyebrowText) + '</span>' +
+              '</div>' +
+              '<h4 class="takeaway-title">' + escapeHtml(titleText) + '</h4>' +
+            '</div>' +
+            bulletsHtml +
+            snippetHtml +
+            proofHtml +
+          '</aside>'
+        );
+      }
+
+      function renderSpecimenHtml(specimen) {
+        if (!specimen) return '';
+        const lines = Array.isArray(specimen.lines) ? specimen.lines : [];
+        const linesHtml = lines.map(function (line) {
+          const t = line.type === 'del' ? 'del' : (line.type === 'ins' ? 'ins' : 'ctx');
+          const prefix = t === 'del' ? '-' : (t === 'ins' ? '+' : ' ');
+          return (
+            '<div class="specimen-line specimen-line-' + t + '">' +
+              '<span class="specimen-prefix">' + prefix + '</span>' +
+              '<span>' + escapeHtml(line.text) + '</span>' +
+            '</div>'
+          );
+        }).join('');
+
+        return (
+          '<div class="specimen-panel">' +
+            '<div>' +
+              '<div class="specimen-header">' +
+                '<span class="specimen-eyebrow">' + escapeHtml(specimen.eyebrow) + '</span>' +
+                '<span class="specimen-dots" aria-hidden="true"><span></span><span></span><span></span></span>' +
+              '</div>' +
+              '<h3 class="specimen-title">' + escapeHtml(specimen.title) + '</h3>' +
+              '<p class="specimen-context">' + escapeHtml(specimen.context) + '</p>' +
+            '</div>' +
+            '<div class="specimen-lines">' + linesHtml + '</div>' +
+            '<div class="specimen-proof">' +
+              '<span class="specimen-proof-badge">✓ PROOF</span>' +
+              '<span>' + escapeHtml(specimen.proof) + '</span>' +
+            '</div>' +
+          '</div>'
+        );
+      }
+
+      function applyPrefsToDOM() {
+        const p = state.prefs;
+        document.body.setAttribute('data-theme', p.theme);
+        document.body.setAttribute('data-motion', p.motionLevel);
+
+        const root = document.documentElement;
+        const fontObj = FONT_MAP[p.fontFamily] || FONT_MAP.sans;
+        const clampedSize = Math.min(21, Math.max(15, Number(p.fontSize) || 17));
+        root.style.setProperty('--reader-font-family', fontObj.css);
+        root.style.setProperty('--reader-font-size', clampedSize + 'px');
+        root.style.setProperty('--reader-line-height', p.lineHeight);
+        root.style.setProperty('--reader-max-width', p.contentWidth + 'px');
+
+        const meta = THEME_META[p.theme] || THEME_META.warm;
+        document.getElementById('quick-theme-label').textContent = meta.label;
+
+        const slider = document.getElementById('drawer-fontsize-slider');
+        if (slider) slider.value = String(clampedSize);
+        document.getElementById('drawer-fontsize-badge').textContent = clampedSize === 17 ? '17px (推荐)' : clampedSize + 'px';
+        document.getElementById('toc-font-val').textContent = clampedSize + 'px';
+        document.getElementById('reader-live-spec').textContent =
+          fontObj.label + ' · ' + clampedSize + 'px · 行高 ' + p.lineHeight + ' · ' + p.contentWidth + 'px';
+
+        document.querySelectorAll('.font-opt-btn').forEach(function (btn) {
+          btn.classList.toggle('nav-pill-active', btn.getAttribute('data-set-font') === p.fontFamily);
+        });
+        document.querySelectorAll('.motion-opt-btn').forEach(function (btn) {
+          btn.classList.toggle('nav-pill-active', btn.getAttribute('data-set-motion') === p.motionLevel);
+        });
+        document.querySelectorAll('.drawer-theme-btn').forEach(function (btn) {
+          btn.classList.toggle('nav-pill-active', btn.getAttribute('data-drawer-theme') === p.theme);
+        });
+        document.querySelectorAll('.lh-opt-btn').forEach(function (btn) {
+          btn.classList.toggle('nav-pill-active', btn.getAttribute('data-set-lh') === p.lineHeight);
+        });
+        document.querySelectorAll('.width-opt-btn').forEach(function (btn) {
+          btn.classList.toggle('nav-pill-active', btn.getAttribute('data-set-width') === p.contentWidth);
+        });
+        document.querySelectorAll('.head-mode-btn').forEach(function (btn) {
+          btn.classList.toggle('nav-pill-active', btn.getAttribute('data-head-mode') === p.headMode);
+        });
+
+        syncParticlesState();
+      }
+
+      function renderHomeView() {
+        document.getElementById('nav-post-count').textContent = String(BLOG_POSTS.length);
+        const profilePostCount = document.getElementById('profile-post-count');
+        if (profilePostCount) profilePostCount.textContent = String(BLOG_POSTS.length);
+        const profileNoteCount = document.getElementById('profile-note-count');
+        if (profileNoteCount) profileNoteCount.textContent = String(MICRO_LOGS.length);
+        document.querySelectorAll('.home-cat-btn').forEach(function (btn) {
+          btn.classList.toggle('nav-pill-active', btn.getAttribute('data-cat') === state.homeCategory);
+        });
+
+        const filtered = BLOG_POSTS.filter(function (p) {
+          return state.homeCategory === 'all' || p.category === state.homeCategory;
+        }).slice().sort(function (a, b) {
+          return String(b.date).localeCompare(String(a.date));
+        });
+
+        const leadSection = document.getElementById('home-lead-section');
+        const leadSlot = document.getElementById('home-lead-slot');
+        const streamSection = document.getElementById('home-stream-section');
+        const streamList = document.getElementById('home-stream-list');
+
+        if (!filtered.length) {
+          leadSection.classList.add('hidden');
+          leadSlot.innerHTML = '';
+          streamSection.classList.remove('hidden');
+          streamList.innerHTML =
+            '<div class="bento-tile" style="padding: 36px 28px; display: flex; flex-direction: column; gap: 12px; align-items: flex-start;">' +
+              '<div class="eyebrow">专栏酝酿中</div>' +
+              '<div style="font-size: 16.5px; font-weight: 600; color: var(--text-primary);">这一栏目的长文还在整理底稿。</div>' +
+              '<div style="font-size: 13.5px; line-height: 1.7; color: var(--text-secondary);">近期与日常、读书或设计有关的零散想法，先收在下方「光影与短记」里；你也可以先浏览全部已发布的文章。</div>' +
+              '<div style="display: flex; gap: 10px; flex-wrap: wrap; margin-top: 4px;">' +
+                '<button type="button" data-cat="all" class="editorial-pill-btn editorial-pill-primary">查看全部文章</button>' +
+                '<button type="button" data-scroll-interlude="1" class="editorial-pill-btn editorial-pill-secondary">看看案头短记 ↓</button>' +
+              '</div>' +
+            '</div>';
+          renderInterlude();
+          renderMicroLogs();
+          return;
+        }
+
+        leadSection.classList.remove('hidden');
+        streamSection.classList.remove('hidden');
+
+        const lead = filtered.find(function (p) { return p.pinned; }) || filtered[0];
+        const leadSaved = Boolean(state.bookmarks[lead.id]);
+        const leadTags = (lead.tags || []).slice(0, 4).map(function (t) {
+          return '<span class="tag-chip">' + escapeHtml(t) + '</span>';
+        }).join('');
+
+        leadSlot.innerHTML =
+          '<article data-read-card="' + escapeHtml(lead.id) + '" class="bento-tile bento-interactive bento-sheen lead-monograph-card">' +
+            '<div class="lead-monograph-copy">' +
+              '<div>' +
+                '<div class="meta-line">' +
+                  '<span class="meta-issue">' + escapeHtml(lead.issueNo) + '</span>' +
+                  '<span style="color: var(--accent-primary); font-weight: 600;">' + escapeHtml(lead.categoryLabel) + '</span>' +
+                  '<span>·</span>' +
+                  '<span class="tabular-nums">' + escapeHtml(lead.date) + (lead.updated ? '（修订 ' + escapeHtml(lead.updated.slice(5)) + '）' : '') + '</span>' +
+                '</div>' +
+                '<h3 class="lead-title">' +
+                  '<button type="button" data-read-post="' + escapeHtml(lead.id) + '">' + escapeHtml(lead.title) + '</button>' +
+                '</h3>' +
+                '<p class="lead-subtitle">' + escapeHtml(lead.subtitle || lead.summary) + '</p>' +
+                '<div class="tag-row">' + leadTags + '</div>' +
+              '</div>' +
+              '<div class="card-footer-row">' +
+                '<span class="tabular-nums" style="font-size: 12.5px; color: var(--text-muted);">约 ' + lead.readMinutes + ' 分钟阅读 · ' + escapeHtml(lead.wordCount) + '</span>' +
+                '<div class="card-footer-actions">' +
+                  '<button type="button" data-toggle-save="' + escapeHtml(lead.id) + '" class="editorial-pill-btn editorial-pill-secondary">' + (leadSaved ? '已收藏' : '收藏') + '</button>' +
+                  '<button type="button" data-read-post="' + escapeHtml(lead.id) + '" class="editorial-pill-btn editorial-pill-primary">阅读全文 →</button>' +
+                '</div>' +
+              '</div>' +
+            '</div>' +
+            renderKeyTakeawayHtml(lead) +
+          '</article>';
+
+        streamList.innerHTML = filtered.map(function (post) {
+          const isSaved = Boolean(state.bookmarks[post.id]);
+          const isLead = post.id === lead.id;
+          const tags = (post.tags || []).slice(0, 3).map(function (t) {
+            return '<span class="tag-chip">' + escapeHtml(t) + '</span>';
+          }).join('');
+          return (
+            '<article data-read-card="' + escapeHtml(post.id) + '" class="bento-tile bento-interactive bento-sheen editorial-post-row">' +
+              '<div class="editorial-post-main">' +
+                '<div class="meta-line">' +
+                  '<span class="tabular-nums">' + escapeHtml(post.date) + '</span>' +
+                  '<span>·</span>' +
+                  '<span style="color: var(--accent-primary); font-weight: 600;">' + escapeHtml(post.categoryLabel) + '</span>' +
+                  (isLead ? '<span class="meta-issue">近期主打</span>' : '') +
+                '</div>' +
+                '<h3 class="editorial-post-title">' +
+                  '<button type="button" data-read-post="' + escapeHtml(post.id) + '">' + escapeHtml(post.title) + '</button>' +
+                '</h3>' +
+                '<p class="editorial-post-summary">' + escapeHtml(post.summary || post.subtitle) + '</p>' +
+                '<div class="editorial-post-meta-bottom">' +
+                  '<div class="tag-row" style="margin-top: 0;">' + tags + '</div>' +
+                  '<span class="tabular-nums" style="font-size: 12px; color: var(--text-muted);">约 ' + post.readMinutes + ' 分钟 · ' + escapeHtml(post.wordCount) + '</span>' +
+                '</div>' +
+              '</div>' +
+              '<div class="editorial-post-aside">' +
+                (post.cover
+                  ? '<div class="editorial-post-thumb">' +
+                      '<img src="' + post.cover + '" alt="' + escapeHtml(post.title) + '" loading="lazy" />' +
+                    '</div>'
+                  : '') +
+                '<div class="card-footer-actions">' +
+                  '<button type="button" data-toggle-save="' + escapeHtml(post.id) + '" class="editorial-pill-btn editorial-pill-secondary">' + (isSaved ? '已收藏' : '收藏') + '</button>' +
+                  '<button type="button" data-read-post="' + escapeHtml(post.id) + '" class="editorial-circle-action" aria-label="阅读文章">→</button>' +
+                '</div>' +
+              '</div>' +
+            '</article>'
+          );
+        }).join('');
+
+        renderInterlude();
+        renderMicroLogs();
+      }
+
+      function renderInterlude() {
+        const scene = INTERLUDE_SCENES[state.interludeKey] || INTERLUDE_SCENES.windowStudy;
+        const img = document.getElementById('interlude-banner-img');
+        const title = document.getElementById('interlude-title');
+        const sub = document.getElementById('interlude-sub');
+        if (img && scene.src) img.src = scene.src;
+        if (title) title.textContent = scene.label;
+        if (sub) sub.textContent = scene.sub || '';
+        document.querySelectorAll('.interlude-tab-btn').forEach(function (btn) {
+          btn.classList.toggle('is-active', btn.getAttribute('data-interlude') === state.interludeKey);
+        });
+      }
+
+      function renderMicroLogs() {
+        const listEl = document.getElementById('home-microlog-list');
+        if (!listEl) return;
+        listEl.innerHTML = MICRO_LOGS.map(function (item) {
+          return (
+            '<div class="microlog-item">' +
+              '<div class="microlog-meta">' +
+                '<span class="microlog-date">' + escapeHtml(item.date) + '</span>' +
+                '<span class="microlog-tag">' + escapeHtml(item.tag) + '</span>' +
+              '</div>' +
+              '<div class="microlog-text">' + escapeHtml(item.text) + '</div>' +
+            '</div>'
+          );
+        }).join('');
+      }
+
+      function renderArchiveView() {
+        const gridEl = document.getElementById('archive-post-grid');
+        if (!gridEl) return;
+
+        const savedCount = Object.keys(state.bookmarks).filter(function (k) { return state.bookmarks[k]; }).length;
+        document.getElementById('saved-count-badge').textContent = String(savedCount);
+        document.getElementById('nav-post-count').textContent = String(BLOG_POSTS.length);
+
+        document.querySelectorAll('.archive-cat-btn').forEach(function (btn) {
+          btn.classList.toggle('nav-pill-active', btn.getAttribute('data-archive-cat') === state.archiveCategory);
+        });
+
+        const q = state.searchQuery.trim().toLowerCase();
+        const list = BLOG_POSTS.filter(function (p) {
+          if (state.archiveCategory === 'saved' && !state.bookmarks[p.id]) return false;
+          if (state.archiveCategory !== 'all' && state.archiveCategory !== 'saved' && p.category !== state.archiveCategory) {
+            return false;
+          }
+          if (!q) return true;
+          const specText = p.specimen
+            ? (p.specimen.title + ' ' + p.specimen.context + ' ' + p.specimen.proof + ' ' + (p.specimen.lines || []).map(function (l) { return l.text; }).join(' '))
+            : '';
+          const haystack = (
+            p.title + ' ' +
+            (p.subtitle || '') + ' ' +
+            (p.summary || '') + ' ' +
+            (p.tags || []).join(' ') + ' ' +
+            (p.tldr || []).join(' ') + ' ' +
+            specText + ' ' +
+            (p.sections || []).map(function (s) { return s.heading + ' ' + stripHtml(s.html); }).join(' ')
+          ).toLowerCase();
+          return haystack.indexOf(q) !== -1;
+        });
+
+        list.sort(function (a, b) {
+          if (state.sortBy === 'short') return a.readMinutes - b.readMinutes;
+          if (state.sortBy === 'saved') {
+            const diff = (state.bookmarks[b.id] ? 1 : 0) - (state.bookmarks[a.id] ? 1 : 0);
+            if (diff !== 0) return diff;
+          }
+          return String(b.date).localeCompare(String(a.date));
+        });
+
+        if (!list.length) {
+          gridEl.innerHTML =
+            '<div class="bento-tile" style="grid-column: 1 / -1; padding: 48px 24px; text-align: center;">' +
+              '<div style="font-size: 16px; font-weight: 600; margin-bottom: 6px;">当前筛选下暂无匹配文章</div>' +
+              '<div style="font-size: 13px; color: var(--text-muted); margin-bottom: 16px;">尝试清空检索词或切回「全部文章」</div>' +
+              '<button type="button" data-reset-archive="1" class="editorial-pill-btn editorial-pill-primary">显示全部文章</button>' +
+            '</div>';
+          return;
+        }
+
+        gridEl.innerHTML = list.map(function (post) {
+          const isSaved = Boolean(state.bookmarks[post.id]);
+          const tags = (post.tags || []).slice(0, 3).map(function (t) {
+            return '<span class="tag-chip">' + escapeHtml(t) + '</span>';
+          }).join('');
+          const firstPoint = Array.isArray(post.tldr) && post.tldr.length ? post.tldr[0] : '';
+          return (
+            '<article data-read-card="' + escapeHtml(post.id) + '" class="bento-tile bento-interactive bento-sheen archive-card">' +
+              '<div style="display: flex; flex-direction: column; gap: 12px; position: relative; z-index: 2;">' +
+                (post.cover
+                  ? '<div class="archive-card-cover">' +
+                      '<img src="' + post.cover + '" alt="' + escapeHtml(post.title) + '" loading="lazy" />' +
+                    '</div>'
+                  : '') +
+                '<div class="meta-line">' +
+                  '<span class="meta-issue">' + escapeHtml(post.issueNo) + '</span>' +
+                  '<span style="color: var(--accent-primary); font-weight: 600;">' + escapeHtml(post.categoryLabel) + '</span>' +
+                  '<span>·</span>' +
+                  '<span class="tabular-nums">' + escapeHtml(post.date) + ' · ' + post.readMinutes + ' 分钟</span>' +
+                '</div>' +
+                '<h2 class="stream-title" style="margin: 0;">' +
+                  '<button type="button" data-read-post="' + escapeHtml(post.id) + '">' + escapeHtml(post.title) + '</button>' +
+                '</h2>' +
+                '<p class="stream-summary" style="margin: 0;">' + escapeHtml(post.summary || post.subtitle) + '</p>' +
+                (firstPoint
+                  ? '<div style="padding: 10px 13px; border-radius: 14px; background: var(--bg-surface-secondary); border: 1px solid var(--hairline); font-size: 12.5px; line-height: 1.58; color: var(--text-secondary);">' +
+                      escapeHtml(firstPoint) +
+                    '</div>'
+                  : '') +
+              '</div>' +
+              '<div class="card-footer-row" style="position: relative; z-index: 2;">' +
+                '<div class="tag-row" style="margin-top: 0;">' + tags + '</div>' +
+                '<div class="card-footer-actions">' +
+                  '<button type="button" data-toggle-save="' + escapeHtml(post.id) + '" class="editorial-pill-btn editorial-pill-secondary">' + (isSaved ? '已收藏' : '收藏') + '</button>' +
+                  '<button type="button" data-read-post="' + escapeHtml(post.id) + '" class="editorial-circle-action" aria-label="阅读文章">→</button>' +
+                '</div>' +
+              '</div>' +
+            '</article>'
+          );
+        }).join('');
+      }
+
+      function renderReaderHeadFrame(post) {
+        const frameEl = document.getElementById('reader-head-frame');
+        if (!frameEl) return;
+        const mode = state.prefs.headMode;
+        if (mode === 'artwork' && post.cover) {
+          frameEl.innerHTML =
+            '<button type="button" class="reader-artwork-wrap" data-open-reader-artwork="true" aria-label="放大查看文章主题插画">' +
+              '<img src="' + post.cover + '" alt="' + escapeHtml(post.title) + '" />' +
+            '</button>';
+        } else if (mode === 'none' || !post.specimen) {
+          frameEl.innerHTML = '<div class="reader-pure-divider" aria-hidden="true"></div>';
+        } else {
+          frameEl.innerHTML = renderSpecimenHtml(post.specimen);
+        }
+      }
+
+      function renderReaderView() {
+        const idx = BLOG_POSTS.findIndex(function (p) { return p.id === state.activePostId; });
+        const actualIdx = idx >= 0 ? idx : 0;
+        const post = BLOG_POSTS[actualIdx];
+        if (!post) return;
+
+        document.getElementById('reader-issue-badge').textContent = post.issueNo;
+        document.getElementById('reader-cat-badge').textContent = post.categoryLabel;
+        document.getElementById('reader-date').textContent = post.date;
+
+        const updEl = document.getElementById('reader-updated');
+        if (post.updated) {
+          updEl.textContent = '· 修订 ' + post.updated;
+          updEl.classList.remove('hidden');
+        } else {
+          updEl.classList.add('hidden');
+        }
+
+        document.getElementById('reader-readtime').textContent = '约 ' + post.readMinutes + ' 分钟 · ' + post.wordCount;
+        document.getElementById('reader-title').textContent = post.title;
+        document.getElementById('reader-subtitle').textContent = post.subtitle || post.summary || '';
+
+        document.getElementById('reader-tags-row').innerHTML = (post.tags || []).map(function (t) {
+          return '<span class="tag-chip">' + escapeHtml(t) + '</span>';
+        }).join('');
+
+        const isSaved = Boolean(state.bookmarks[post.id]);
+        document.getElementById('reader-bookmark-icon').textContent = isSaved ? '★' : '☆';
+        document.getElementById('reader-bookmark-label').textContent = isSaved ? '已收藏' : '收藏备忘';
+
+        const tldrBox = document.getElementById('reader-tldr-box');
+        const tldrList = document.getElementById('reader-tldr-list');
+        if (Array.isArray(post.tldr) && post.tldr.length) {
+          tldrBox.classList.remove('hidden');
+          tldrList.innerHTML = post.tldr.map(function (item) {
+            return '<li>' + escapeHtml(item) + '</li>';
+          }).join('');
+        } else {
+          tldrBox.classList.add('hidden');
+        }
+
+        renderReaderHeadFrame(post);
+
+        const boundaryBox = document.getElementById('reader-boundary-box');
+        const boundaryText = document.getElementById('reader-boundary-text');
+        if (post.boundaryNote) {
+          boundaryBox.classList.remove('hidden');
+          boundaryText.textContent = post.boundaryNote;
+        } else {
+          boundaryBox.classList.add('hidden');
+        }
+
+        const proseEl = document.getElementById('reader-prose-body');
+        proseEl.innerHTML = (post.sections || []).map(function (sec) {
+          return (
+            '<section data-reader-sec="' + escapeHtml(sec.id) + '">' +
+              '<h2 id="' + escapeHtml(sec.id) + '">' + escapeHtml(sec.heading) + '</h2>' +
+              sec.html +
+            '</section>'
+          );
+        }).join('');
+
+        // Extract h2 and h3 dynamically for indented multi-level TOC
+        const headingNodes = proseEl.querySelectorAll('h2, h3');
+        state.activeHeadings = [];
+        headingNodes.forEach(function (node, i) {
+          if (!node.id) {
+            node.id = 'heading-anchor-' + i;
+          }
+          state.activeHeadings.push({
+            id: node.id,
+            text: node.textContent.trim(),
+            depth: node.tagName === 'H3' ? 3 : 2
+          });
+        });
+
+        const tocMarkup = state.activeHeadings.map(function (h, i) {
+          const depthCls = h.depth === 3 ? ' is-depth-3' : '';
+          const activeCls = i === 0 ? ' toc-item-active' : '';
+          return (
+            '<button type="button" data-toc-target="' + escapeHtml(h.id) + '" class="toc-link-btn' + depthCls + activeCls + '">' +
+              escapeHtml(h.text) +
+            '</button>'
+          );
+        }).join('');
+        document.getElementById('reader-desktop-toc').innerHTML = tocMarkup;
+        document.getElementById('reader-mobile-toc-links').innerHTML = tocMarkup;
+
+        const footBox = document.getElementById('reader-footnote-box');
+        const footText = document.getElementById('reader-footnote-text');
+        if (post.footnote) {
+          footBox.classList.remove('hidden');
+          footText.textContent = post.footnote;
+        } else {
+          footBox.classList.add('hidden');
+        }
+
+        const prevPost = BLOG_POSTS[(actualIdx - 1 + BLOG_POSTS.length) % BLOG_POSTS.length];
+        const nextPost = BLOG_POSTS[(actualIdx + 1) % BLOG_POSTS.length];
+        document.getElementById('reader-prev-next').innerHTML =
+          '<button type="button" data-read-post="' + escapeHtml(prevPost.id) + '" class="prev-next-btn">' +
+            '<div class="eyebrow">Previous · 上一篇</div>' +
+            '<div class="prev-next-title">' + escapeHtml(prevPost.title) + '</div>' +
+          '</button>' +
+          '<button type="button" data-read-post="' + escapeHtml(nextPost.id) + '" class="prev-next-btn is-next">' +
+            '<div class="eyebrow">Next · 下一篇</div>' +
+            '<div class="prev-next-title">' + escapeHtml(nextPost.title) + '</div>' +
+          '</button>';
+
+        updateScrollProgressAndTOC();
+      }
+
+      function switchView(nextView, opts) {
+        const options = opts || {};
+        const changed = state.activeView !== nextView;
+        state.activeView = nextView;
+        state.mobileMenuOpen = false;
+        document.getElementById('mobile-nav-panel').classList.add('hidden');
+
+        if (changed && state.prefs.motionLevel === 'full') {
+          const shutter = document.getElementById('shutter-wipe');
+          shutter.classList.remove('is-passing');
+          void shutter.offsetWidth;
+          shutter.classList.add('is-passing');
+        }
+
+        ['home', 'blog', 'reader'].forEach(function (v) {
+          const el = document.getElementById('view-' + v);
+          if (el) el.classList.toggle('hidden', v !== nextView);
+        });
+
+        document.querySelectorAll('.nav-tab').forEach(function (btn) {
+          btn.classList.toggle('nav-pill-active', btn.getAttribute('data-nav') === nextView);
+        });
+
+        const customizerTopBtn = document.getElementById('open-customizer-btn');
+        if (customizerTopBtn) {
+          customizerTopBtn.classList.toggle('hidden', nextView !== 'reader');
+        }
+        if (nextView !== 'reader' && state.customizerOpen) {
+          toggleCustomizer(false);
+        }
+
+        if (nextView === 'home') renderHomeView();
+        if (nextView === 'blog') renderArchiveView();
+        if (nextView === 'reader') renderReaderView();
+
+        syncParticlesState();
+
+        if (!options.keepScroll) {
+          window.scrollTo({ top: 0, behavior: state.prefs.motionLevel === 'none' ? 'auto' : 'smooth' });
+        }
+        updateScrollProgressAndTOC();
+      }
+
+      function openPostInReader(postId) {
+        state.activePostId = postId;
+        state.mobileTocOpen = false;
+        document.getElementById('reader-mobile-toc-panel').classList.add('hidden');
+        switchView('reader');
+      }
+
+      function toggleCustomizer(open) {
+        state.customizerOpen = open;
+        document.getElementById('customizer-backdrop').classList.toggle('hidden', !open);
+        document.getElementById('customizer-drawer').classList.toggle('hidden', !open);
+      }
+
+      function initStaticImages() {
+        const brandImg = document.getElementById('brand-avatar-img');
+        if (brandImg && IMAGES.avatarCaramel) brandImg.src = IMAGES.avatarCaramel;
+        const profileImg = document.getElementById('profile-avatar-img');
+        if (profileImg && IMAGES.avatarCaramel) profileImg.src = IMAGES.avatarCaramel;
+        const heroBgImg = document.getElementById('hero-fable-bg-img');
+        if (heroBgImg && IMAGES.fableHeroCanvas) heroBgImg.src = IMAGES.fableHeroCanvas;
+        const heroSketchImg = document.getElementById('hero-paper-sketch-img');
+        if (heroSketchImg && IMAGES.paperBlendSketch) heroSketchImg.src = IMAGES.paperBlendSketch;
+        const companionImg = document.getElementById('masthead-companion-img');
+        if (companionImg && IMAGES.companionNightOwl) companionImg.src = IMAGES.companionNightOwl;
+        const micrologImg = document.getElementById('microlog-avatar-img');
+        if (micrologImg && IMAGES.avatarCaramel) micrologImg.src = IMAGES.avatarCaramel;
+      }
+
+      function setLightboxBackgroundInert(isInert) {
+        ['.masthead', '.main-canvas', '.site-footer', '#customizer-drawer'].forEach(function (sel) {
+          const el = document.querySelector(sel);
+          if (!el) return;
+          if (isInert) {
+            el.setAttribute('inert', '');
+            el.setAttribute('aria-hidden', 'true');
+          } else {
+            el.removeAttribute('inert');
+            el.removeAttribute('aria-hidden');
+          }
+        });
+      }
+
+      function openArtworkLightbox(opts) {
+        const cfg = opts || {};
+        const box = document.getElementById('artwork-lightbox');
+        const img = document.getElementById('lightbox-img');
+        if (!box || !img || !cfg.src) return;
+        state.lightboxTriggerEl = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+        document.getElementById('lightbox-eyebrow').textContent = cfg.eyebrow || 'VISUAL CORNER · 光影画匣';
+        document.getElementById('lightbox-title').textContent = cfg.title || '插画预览';
+        document.getElementById('lightbox-sub').textContent = cfg.sub || '';
+        img.src = cfg.src;
+        img.alt = cfg.title || '插画预览';
+        setLightboxBackgroundInert(true);
+        state.lightboxOpen = true;
+        box.classList.remove('hidden');
+        const closeBtn = document.getElementById('close-lightbox-btn');
+        if (closeBtn) closeBtn.focus();
+      }
+
+      function closeArtworkLightbox() {
+        const box = document.getElementById('artwork-lightbox');
+        if (!box) return;
+        state.lightboxOpen = false;
+        box.classList.add('hidden');
+        setLightboxBackgroundInert(false);
+        const trigger = state.lightboxTriggerEl;
+        state.lightboxTriggerEl = null;
+        if (trigger && typeof trigger.focus === 'function' && document.contains(trigger)) {
+          trigger.focus();
+        }
+      }
+
+      function copyTextSafe(text, btnEl) {
+        function onDone() {
+          showToast('代码已复制到剪贴板');
+          if (btnEl) {
+            if (!btnEl.dataset.origLabel) btnEl.dataset.origLabel = btnEl.textContent;
+            btnEl.textContent = '已复制 ✓';
+            clearTimeout(btnEl._copyTimer);
+            btnEl._copyTimer = setTimeout(function () {
+              btnEl.textContent = btnEl.dataset.origLabel || '复制代码';
+            }, 1600);
+          }
+        }
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(text).then(onDone).catch(function () {
+            fallbackCopy(text, onDone);
+          });
+        } else {
+          fallbackCopy(text, onDone);
+        }
+      }
+
+      function fallbackCopy(text, onDone) {
+        const ta = document.createElement('textarea');
+        ta.value = text;
+        ta.style.position = 'fixed';
+        ta.style.opacity = '0';
+        document.body.appendChild(ta);
+        ta.select();
+        try {
+          document.execCommand('copy');
+          onDone();
+        } catch (err) {
+          showToast('请手动选中代码复制');
+        }
+        document.body.removeChild(ta);
+      }
+
+      function updateScrollProgressAndTOC() {
+        const docEl = document.documentElement;
+        const scrollTop = window.scrollY || docEl.scrollTop || 0;
+        const maxScroll = Math.max(1, docEl.scrollHeight - window.innerHeight);
+        const pct = docEl.scrollHeight <= window.innerHeight + 8 ? 0 : Math.min(100, Math.max(0, (scrollTop / maxScroll) * 100));
+
+        const bar = document.getElementById('reading-progress-bar');
+        if (bar) bar.style.width = pct.toFixed(1) + '%';
+
+        const pctLabel = document.getElementById('toc-progress-pct');
+        if (pctLabel) pctLabel.textContent = Math.round(pct) + '%';
+
+        if (state.activeView === 'reader' && state.activeHeadings.length) {
+          let currentId = state.activeHeadings[0].id;
+          state.activeHeadings.forEach(function (h) {
+            const el = document.getElementById(h.id);
+            if (el) {
+              const rect = el.getBoundingClientRect();
+              if (rect.top <= 145) currentId = h.id;
+            }
+          });
+          document.querySelectorAll('.toc-link-btn').forEach(function (btn) {
+            btn.classList.toggle('toc-item-active', btn.getAttribute('data-toc-target') === currentId);
+          });
+        }
+      }
+
+      // ==================== VISUAL INTERLUDE ATMOSPHERIC PARTICLES ====================
+      let particleAnimId = null;
+      let particles = [];
+
+      function initParticles(canvas) {
+        particles = [];
+        for (let i = 0; i < 18; i++) {
+          particles.push({
+            x: Math.random() * canvas.width,
+            y: Math.random() * canvas.height,
+            r: 1.2 + Math.random() * 2.0,
+            vx: (Math.random() - 0.35) * 0.32,
+            vy: 0.18 + Math.random() * 0.38,
+            alpha: 0.16 + Math.random() * 0.34
+          });
+        }
+      }
+
+      function resizeHeroCanvas() {
+        const canvas = document.getElementById('hero-particles');
+        if (!canvas || !canvas.parentElement) return;
+        const rect = canvas.parentElement.getBoundingClientRect();
+        if (rect.width > 0 && rect.height > 0) {
+          canvas.width = rect.width;
+          canvas.height = rect.height;
+          initParticles(canvas);
+        }
+      }
+
+      function syncParticlesState() {
+        if (particleAnimId) {
+          cancelAnimationFrame(particleAnimId);
+          particleAnimId = null;
+        }
+        const canvas = document.getElementById('hero-particles');
+        if (!canvas) return;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return;
+
+        if (document.hidden || state.activeView !== 'home' || state.prefs.motionLevel !== 'full') {
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+          return;
+        }
+
+        if (!canvas.width || !particles.length) {
+          resizeHeroCanvas();
+        }
+
+        function tick() {
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+          const theme = state.prefs.theme;
+          particles.forEach(function (pt) {
+            pt.x += pt.vx;
+            pt.y += pt.vy;
+            if (pt.y > canvas.height + 8) {
+              pt.y = -8;
+              pt.x = Math.random() * canvas.width;
+            }
+            if (pt.x > canvas.width + 8) pt.x = -8;
+            if (pt.x < -8) pt.x = canvas.width + 8;
+
+            ctx.beginPath();
+            if (theme === 'night') {
+              ctx.fillStyle = 'rgba(224, 130, 99, ' + (pt.alpha * 0.85) + ')';
+              ctx.arc(pt.x, pt.y, pt.r, 0, Math.PI * 2);
+            } else if (theme === 'daylight') {
+              ctx.fillStyle = 'rgba(255, 252, 240, ' + pt.alpha + ')';
+              ctx.arc(pt.x, pt.y, pt.r, 0, Math.PI * 2);
+            } else {
+              ctx.fillStyle = 'rgba(255, 236, 210, ' + pt.alpha + ')';
+              ctx.arc(pt.x, pt.y, pt.r, 0, Math.PI * 2);
+            }
+            ctx.fill();
+          });
+          particleAnimId = requestAnimationFrame(tick);
+        }
+        particleAnimId = requestAnimationFrame(tick);
+      }
+
+      // ==================== EVENTS ====================
+      function bindEvents() {
+        document.getElementById('brand-home-btn').addEventListener('click', function () {
+          switchView('home');
+        });
+        document.getElementById('home-go-archive-top').addEventListener('click', function () {
+          switchView('blog');
+        });
+        document.getElementById('footer-go-home').addEventListener('click', function () {
+          switchView('home');
+        });
+        document.getElementById('footer-go-blog').addEventListener('click', function () {
+          switchView('blog');
+        });
+        document.getElementById('footer-scroll-top').addEventListener('click', function () {
+          window.scrollTo({ top: 0, behavior: state.prefs.motionLevel === 'none' ? 'auto' : 'smooth' });
+        });
+        document.getElementById('mobile-menu-btn').addEventListener('click', function () {
+          state.mobileMenuOpen = !state.mobileMenuOpen;
+          document.getElementById('mobile-nav-panel').classList.toggle('hidden', !state.mobileMenuOpen);
+        });
+
+        document.getElementById('quick-theme-btn').addEventListener('click', function () {
+          const order = ['warm', 'night', 'daylight'];
+          const next = order[(order.indexOf(state.prefs.theme) + 1) % order.length];
+          state.prefs.theme = next;
+          applyPrefsToDOM();
+          savePrefs();
+          showToast('底纸已切换至「' + THEME_META[next].label + '」');
+        });
+
+        document.getElementById('open-customizer-btn').addEventListener('click', function () {
+          toggleCustomizer(true);
+        });
+        document.getElementById('reader-customizer-btn').addEventListener('click', function () {
+          toggleCustomizer(true);
+        });
+        document.getElementById('close-customizer-btn').addEventListener('click', function () {
+          toggleCustomizer(false);
+        });
+        document.getElementById('customizer-backdrop').addEventListener('click', function () {
+          toggleCustomizer(false);
+        });
+        document.getElementById('drawer-jump-reader-btn').addEventListener('click', function () {
+          toggleCustomizer(false);
+        });
+        document.getElementById('drawer-reset-prefs-btn').addEventListener('click', function () {
+          state.prefs = Object.assign({}, DEFAULT_PREFS);
+          applyPrefsToDOM();
+          if (state.activeView === 'reader') {
+            const p = BLOG_POSTS.find(function (x) { return x.id === state.activePostId; }) || BLOG_POSTS[0];
+            if (p) renderReaderHeadFrame(p);
+          }
+          savePrefs();
+          showToast('已恢复推荐排版与底纸');
+        });
+
+        document.getElementById('drawer-fontsize-slider').addEventListener('input', function (e) {
+          state.prefs.fontSize = Math.min(21, Math.max(15, Number(e.target.value) || 17));
+          applyPrefsToDOM();
+          savePrefs();
+        });
+        document.getElementById('toc-font-dec').addEventListener('click', function () {
+          if (state.prefs.fontSize > 15) {
+            state.prefs.fontSize -= 1;
+            applyPrefsToDOM();
+            savePrefs();
+          } else {
+            showToast('已达最小安全字号 15px');
+          }
+        });
+        document.getElementById('toc-font-inc').addEventListener('click', function () {
+          if (state.prefs.fontSize < 21) {
+            state.prefs.fontSize += 1;
+            applyPrefsToDOM();
+            savePrefs();
+          } else {
+            showToast('已达最大保护字号 21px');
+          }
+        });
+        document.getElementById('toc-scroll-top').addEventListener('click', function () {
+          window.scrollTo({ top: 0, behavior: state.prefs.motionLevel === 'none' ? 'auto' : 'smooth' });
+        });
+
+        document.getElementById('reader-back-blog-btn').addEventListener('click', function () {
+          switchView('blog');
+        });
+        document.getElementById('reader-mobile-toc-btn').addEventListener('click', function () {
+          state.mobileTocOpen = !state.mobileTocOpen;
+          document.getElementById('reader-mobile-toc-panel').classList.toggle('hidden', !state.mobileTocOpen);
+        });
+        document.getElementById('reader-bookmark-btn').addEventListener('click', function () {
+          const id = state.activePostId;
+          state.bookmarks[id] = !state.bookmarks[id];
+          savePrefs();
+          renderReaderView();
+          renderHomeView();
+          renderArchiveView();
+          showToast(state.bookmarks[id] ? '已加入收藏备忘' : '已移除收藏');
+        });
+
+        document.getElementById('blog-search-input').addEventListener('input', function (e) {
+          state.searchQuery = e.target.value || '';
+          renderArchiveView();
+        });
+        document.getElementById('blog-sort-select').addEventListener('change', function (e) {
+          state.sortBy = e.target.value || 'latest';
+          renderArchiveView();
+        });
+
+        document.getElementById('profile-avatar-trigger').addEventListener('click', function () {
+          openArtworkLightbox({
+            eyebrow: 'PROFILE · 个人头像',
+            title: 'CaramelizedCUDA',
+            sub: 'Caramelized Notes · 焦糖笔记作者头像',
+            src: IMAGES.avatarCaramel
+          });
+        });
+
+        document.getElementById('masthead-companion-trigger').addEventListener('click', function () {
+          openArtworkLightbox({
+            eyebrow: 'NIGHT OWL NOTES · 深夜案头',
+            title: '案头拾零与夜读时间',
+            sub: '白日研究系统与工具链，深夜随手记下案头的吉光片羽。',
+            src: IMAGES.companionNightOwl
+          });
+        });
+
+        document.getElementById('hero-fable-preview-btn').addEventListener('click', function () {
+          openArtworkLightbox({
+            eyebrow: 'ARCHIVAL HERO PLATE · 卷首纸面画卷',
+            title: '研究、观察与档案纸页',
+            sub: '围绕中心留白的博物学边缘叙事：橄榄枝、星盘弧线、暖色纸蛾与钢笔笔记，融入三套主题纸面肌理。',
+            src: IMAGES.fableHeroCanvas
+          });
+        });
+
+        function openCurrentInterludeLightbox() {
+          const scene = INTERLUDE_SCENES[state.interludeKey] || INTERLUDE_SCENES.windowStudy;
+          openArtworkLightbox({
+            eyebrow: 'VISUAL CORNER · 光影画匣',
+            title: scene.label,
+            sub: scene.sub,
+            src: scene.src
+          });
+        }
+        document.getElementById('interlude-banner-img').addEventListener('click', openCurrentInterludeLightbox);
+        document.getElementById('interlude-zoom-btn').addEventListener('click', openCurrentInterludeLightbox);
+        document.getElementById('close-lightbox-btn').addEventListener('click', closeArtworkLightbox);
+        document.getElementById('lightbox-backdrop').addEventListener('click', closeArtworkLightbox);
+
+        document.addEventListener('keydown', function (e) {
+          if (state.lightboxOpen) {
+            if (e.key === 'Escape') {
+              e.preventDefault();
+              closeArtworkLightbox();
+              return;
+            }
+            if (e.key === 'Tab') {
+              e.preventDefault();
+              const closeBtn = document.getElementById('close-lightbox-btn');
+              if (closeBtn) closeBtn.focus();
+              return;
+            }
+          }
+          if (e.key === 'Escape') {
+            if (state.customizerOpen) toggleCustomizer(false);
+            if (state.mobileMenuOpen) {
+              state.mobileMenuOpen = false;
+              document.getElementById('mobile-nav-panel').classList.add('hidden');
+            }
+          }
+        });
+
+        document.addEventListener('pointermove', function (e) {
+          if (state.prefs.motionLevel !== 'full') return;
+          const tile = e.target.closest('.bento-sheen');
+          if (!tile) return;
+          const rect = tile.getBoundingClientRect();
+          tile.style.setProperty('--mx', (e.clientX - rect.left) + 'px');
+          tile.style.setProperty('--my', (e.clientY - rect.top) + 'px');
+        }, { passive: true });
+
+        document.addEventListener('click', function (e) {
+          const btn = e.target.closest('button');
+          if (btn) {
+            const navTarget = btn.getAttribute('data-nav');
+            if (navTarget) {
+              switchView(navTarget);
+              return;
+            }
+
+            const readPostId = btn.getAttribute('data-read-post');
+            if (readPostId) {
+              openPostInReader(readPostId);
+              return;
+            }
+
+            const toggleSaveId = btn.getAttribute('data-toggle-save');
+            if (toggleSaveId) {
+              state.bookmarks[toggleSaveId] = !state.bookmarks[toggleSaveId];
+              savePrefs();
+              if (state.activeView === 'home') renderHomeView();
+              if (state.activeView === 'blog') renderArchiveView();
+              if (state.activeView === 'reader') renderReaderView();
+              showToast(state.bookmarks[toggleSaveId] ? '已加入收藏备忘' : '已移除收藏');
+              return;
+            }
+
+            const homeCat = btn.getAttribute('data-cat');
+            if (homeCat) {
+              state.homeCategory = homeCat;
+              renderHomeView();
+              return;
+            }
+
+            if (btn.getAttribute('data-scroll-interlude')) {
+              const targetSection = document.getElementById('home-interlude-section');
+              if (targetSection) {
+                targetSection.scrollIntoView({ behavior: state.prefs.motionLevel === 'none' ? 'auto' : 'smooth', block: 'start' });
+              }
+              return;
+            }
+
+            const archiveCat = btn.getAttribute('data-archive-cat');
+            if (archiveCat) {
+              state.archiveCategory = archiveCat;
+              renderArchiveView();
+              return;
+            }
+
+            if (btn.getAttribute('data-reset-archive')) {
+              state.archiveCategory = 'all';
+              state.searchQuery = '';
+              document.getElementById('blog-search-input').value = '';
+              renderArchiveView();
+              return;
+            }
+
+            const interludeKey = btn.getAttribute('data-interlude');
+            if (interludeKey && INTERLUDE_SCENES[interludeKey]) {
+              state.interludeKey = interludeKey;
+              renderInterlude();
+              return;
+            }
+
+            const headMode = btn.getAttribute('data-head-mode');
+            if (headMode) {
+              state.prefs.headMode = headMode;
+              applyPrefsToDOM();
+              savePrefs();
+              const post = BLOG_POSTS.find(function (p) { return p.id === state.activePostId; }) || BLOG_POSTS[0];
+              if (post) renderReaderHeadFrame(post);
+              return;
+            }
+
+            const fontKey = btn.getAttribute('data-set-font');
+            if (fontKey && FONT_MAP[fontKey]) {
+              state.prefs.fontFamily = fontKey;
+              applyPrefsToDOM();
+              savePrefs();
+              showToast('正文字体已切换为「' + FONT_MAP[fontKey].label + '」');
+              return;
+            }
+
+            const motionKey = btn.getAttribute('data-set-motion');
+            if (motionKey && MOTION_META[motionKey]) {
+              state.prefs.motionLevel = motionKey;
+              applyPrefsToDOM();
+              savePrefs();
+              showToast('动效已切换为「' + MOTION_META[motionKey] + '」');
+              return;
+            }
+
+            const drawerTheme = btn.getAttribute('data-drawer-theme');
+            if (drawerTheme && THEME_META[drawerTheme]) {
+              state.prefs.theme = drawerTheme;
+              applyPrefsToDOM();
+              savePrefs();
+              return;
+            }
+
+            const lhVal = btn.getAttribute('data-set-lh');
+            if (lhVal) {
+              state.prefs.lineHeight = lhVal;
+              applyPrefsToDOM();
+              savePrefs();
+              return;
+            }
+
+            const widthVal = btn.getAttribute('data-set-width');
+            if (widthVal) {
+              state.prefs.contentWidth = widthVal;
+              applyPrefsToDOM();
+              savePrefs();
+              return;
+            }
+
+            const tocTarget = btn.getAttribute('data-toc-target');
+            if (tocTarget) {
+              const targetEl = document.getElementById(tocTarget);
+              if (targetEl) {
+                targetEl.scrollIntoView({ behavior: state.prefs.motionLevel === 'none' ? 'auto' : 'smooth', block: 'start' });
+              }
+              state.mobileTocOpen = false;
+              document.getElementById('reader-mobile-toc-panel').classList.add('hidden');
+              return;
+            }
+
+            if (btn.getAttribute('data-open-reader-artwork')) {
+              const post = BLOG_POSTS.find(function (p) { return p.id === state.activePostId; });
+              if (post && post.cover) {
+                openArtworkLightbox({
+                  eyebrow: post.issueNo + ' · 主题插画',
+                  title: post.title,
+                  sub: post.subtitle || post.summary || '',
+                  src: post.cover
+                });
+              }
+              return;
+            }
+
+            if (btn.classList.contains('code-copy-btn') || btn.hasAttribute('data-copy-code')) {
+              const fig = btn.closest('.code-figure');
+              const codeEl = fig ? fig.querySelector('pre code') : null;
+              const copyAttr = btn.getAttribute('data-copy-code');
+              const codeText = codeEl ? codeEl.textContent : (copyAttr ? decodeURIComponent(copyAttr) : '');
+              if (codeText) copyTextSafe(codeText, btn);
+              return;
+            }
+
+            return;
+          }
+
+          if (e.target.closest('a')) return;
+
+          const card = e.target.closest('[data-read-card]');
+          if (card) {
+            openPostInReader(card.getAttribute('data-read-card'));
+          }
+        });
+
+        document.addEventListener('visibilitychange', syncParticlesState);
+        window.addEventListener('scroll', updateScrollProgressAndTOC, { passive: true });
+        window.addEventListener('resize', function () {
+          resizeHeroCanvas();
+          syncParticlesState();
+        });
+      }
+
+      window.addEventListener('DOMContentLoaded', function () {
+        loadSavedState();
+        initStaticImages();
+        bindEvents();
+        applyPrefsToDOM();
+        switchView('home', { keepScroll: true });
+        resizeHeroCanvas();
+        syncParticlesState();
+      });
+    })();
+  </script>
+</body>
+</html>

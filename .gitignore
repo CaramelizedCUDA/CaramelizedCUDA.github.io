@@ -1,7 +1,7 @@
 _inbox/
 drafts/
 .review/
-.prototype_src/
 node_modules/
 dist/
 .astro/
+material/
