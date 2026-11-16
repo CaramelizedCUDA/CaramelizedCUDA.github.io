@@ -4354,9 +4354,9 @@ const isFile = (path) =&gt; {
           pinned: false,
           category: "engineering",
           categoryLabel: "工程与系统",
-          title: "Codex Remote 踩坑：明明用 Plus 登录，为什么还说供应商是 custom？",
+          title: "Codex Remote 踩坑：明明用 ChatGPT 账号登录，为什么还说供应商是 custom？",
           subtitle: "安卓手机 ChatGPT Remote 连接 Windows 主机时旧对话能接着聊，发起新对话第一条消息却报 modelProviderMismatch。顺着 config.toml 与会话归档排查登录态、默认供应商 ID 与显示名的错位。",
-          summary: "排查安卓 ChatGPT Remote 连 Windows 主机新建对话报 This chat uses openai, but your current provider is custom：厘清 Plus 登录、model_provider ID 与显示名 OpenAI 三者关系，同步对齐 config.toml、387 个归档首行与 SQLite 索引（421 条），并记录无项目对话仍落回 C 盘的遗留问题。",
+          summary: "排查安卓 ChatGPT Remote 连 Windows 主机新建对话报 This chat uses openai, but your current provider is custom：厘清 ChatGPT 账号登录、model_provider ID 与显示名 OpenAI 三者关系，同步对齐 config.toml、387 个归档首行与 SQLite 索引（421 条），并记录无项目对话仍落回 C 盘的遗留问题。",
           date: "2026-11-09",
           readMinutes: 4,
           wordCount: "2,551 字符",
@@ -4375,7 +4375,7 @@ const isFile = (path) =&gt; {
           },
           tldr: [
             "手机端 Remote 续聊已有对话正常，但新建对话首条消息即报 This chat uses openai, but your current provider is custom。",
-            "主机 config.toml 遗留 model_provider = \"custom\"（显示名虽为 OpenAI 且沿用 Plus 登录），与手机端新建会话固定使用的 openai 冲突。",
+            "主机 config.toml 遗留 model_provider = \"custom\"（显示名虽为 OpenAI 且沿用 ChatGPT 账号登录），与手机端新建会话固定使用的 openai 冲突。",
             "隔离测试表明不能只改 config.toml：旧会话自身保存了供应商 ID，单改主机默认值会在续聊旧会话时反向报 modelProviderMismatch。",
             "将默认配置、会话归档首行与 SQLite 索引统一对齐为 openai 后恢复新建与收发；但手机端「不指定项目」入口仍未遵循 D 盘工作目录设置。"
           ],
