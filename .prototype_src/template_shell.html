@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Caramelized Notes · 焦糖笔记 — CaramelizedCUDA</title>
+  <!-- __INJECT_HEAD_META__ -->
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Newsreader:ital,opsz,wght@0,6..72,400..600;1,6..72,400&display=swap" rel="stylesheet" />
@@ -39,6 +39,8 @@
       --font-sans: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei UI', 'Segoe UI', 'Noto Sans SC', sans-serif;
       --font-serif-display: 'Newsreader', 'Songti SC', 'STSong', 'Noto Serif SC', Georgia, serif;
       --font-mono: 'JetBrains Mono', ui-monospace, 'Cascadia Mono', 'SFMono-Regular', Menlo, Consolas, monospace;
+      /* 楷体不加载 webfont：本机装有霞鹜文楷时优先，否则落到各平台系统楷体 */
+      --font-kai: 'LXGW WenKai', 'LXGW WenKai Screen', 'Kaiti SC', 'STKaiti', 'KaiTi', 'AR PL UKai CN', serif;
 
       /* Bounded Reader Customizer Variables */
       --reader-font-family: var(--font-sans);
@@ -79,34 +81,6 @@
       --card-shadow: 0 12px 34px rgba(0, 0, 0, 0.44);
       --card-shadow-hover: 0 24px 54px rgba(0, 0, 0, 0.65);
       --specular-sheen: rgba(224, 130, 99, 0.085);
-    }
-
-    [data-theme="daylight"] {
-      /* Daylight Gallery */
-      --bg-page: #f5f5f7;
-      --bg-surface: #ffffff;
-      --bg-surface-secondary: #fbfbfd;
-      --bg-pro-tile: #1d1d1f;
-      --text-pro-tile: #f5f5f7;
-      --bg-code: #161617;
-      --bg-subtle: rgba(0, 0, 0, 0.042);
-      --bg-subtle-hover: rgba(0, 0, 0, 0.075);
-      --bg-glass: rgba(245, 245, 247, 0.82);
-      --bg-sheet: rgba(255, 255, 255, 0.92);
-
-      --text-primary: #1d1d1f;
-      --text-secondary: #515154;
-      --text-muted: #86868b;
-      --accent-primary: #0066cc;
-      --accent-hover: #0077ed;
-      --accent-soft: rgba(0, 102, 204, 0.10);
-      --code-inline-fg: #0055b3;
-
-      --hairline: rgba(0, 0, 0, 0.065);
-      --hairline-strong: rgba(0, 0, 0, 0.13);
-      --card-shadow: 0 4px 24px rgba(0, 0, 0, 0.035), 0 1px 2px rgba(0, 0, 0, 0.02);
-      --card-shadow-hover: 0 22px 48px rgba(0, 0, 0, 0.085), 0 2px 6px rgba(0, 0, 0, 0.03);
-      --specular-sheen: rgba(0, 102, 204, 0.045);
     }
 
     [data-motion="subtle"] {
@@ -775,18 +749,6 @@
       transition: opacity var(--dur-base) var(--ease-spring), filter var(--dur-base) var(--ease-spring);
     }
 
-    [data-theme="daylight"] .hero-fable-bg-img {
-      mix-blend-mode: multiply;
-      filter: saturate(0.85) brightness(1.03);
-      opacity: 0.56;
-    }
-
-    [data-theme="daylight"] .hero-paper-sketch-img {
-      mix-blend-mode: multiply;
-      filter: saturate(0.85) brightness(1.03);
-      opacity: 0.16;
-    }
-
     [data-theme="night"] .hero-fable-bg-img {
       filter: invert(0.92) hue-rotate(180deg) sepia(0.28) saturate(0.78) brightness(0.88);
       mix-blend-mode: screen;
@@ -832,10 +794,6 @@
       -webkit-backdrop-filter: blur(8px);
     }
 
-    [data-theme="daylight"] .hero-fable-preview-btn {
-      background: rgba(255, 255, 255, 0.8);
-    }
-
     [data-theme="night"] .hero-fable-preview-btn {
       background: rgba(27, 26, 24, 0.72);
     }
@@ -870,10 +828,6 @@
       -webkit-backdrop-filter: blur(8px);
     }
 
-    [data-theme="daylight"] .axioms-card {
-      background: rgba(255, 255, 255, 0.76);
-    }
-
     [data-theme="night"] .axioms-card {
       background: rgba(27, 26, 24, 0.76);
     }
@@ -886,10 +840,6 @@
       border-radius: 18px;
       background: rgba(240, 235, 225, 0.72);
       border: 1px solid var(--hairline);
-    }
-
-    [data-theme="daylight"] .masthead-companion {
-      background: rgba(245, 245, 247, 0.82);
     }
 
     [data-theme="night"] .masthead-companion {
@@ -1124,10 +1074,6 @@
       letter-spacing: 0.07em;
       text-transform: uppercase;
       color: #e08263;
-    }
-
-    [data-theme="daylight"] .specimen-eyebrow {
-      color: #6ab0ff;
     }
 
     .specimen-dots {
@@ -2697,7 +2643,8 @@
 
       .desktop-nav,
       .brand-author,
-      .quick-theme-text {
+      .quick-theme-text,
+      .customizer-btn-text {
         display: none;
       }
 
@@ -2822,20 +2769,20 @@
         <button type="button" data-nav="home" class="nav-tab capsule-seg-item">首页</button>
         <button type="button" data-nav="blog" class="nav-tab capsule-seg-item">
           <span>文章归档</span>
-          <span id="nav-post-count" class="nav-count-badge">3</span>
+          <span id="nav-post-count" class="nav-count-badge">5</span>
         </button>
         <button type="button" data-nav="reader" class="nav-tab capsule-seg-item">阅读</button>
       </nav>
 
       <div class="masthead-actions">
-        <button type="button" id="quick-theme-btn" class="editorial-pill-btn editorial-pill-secondary" title="切换焦糖和纸 / 暖炭暗夜 / 晴空昼白">
+        <button type="button" id="quick-theme-btn" class="editorial-pill-btn editorial-pill-secondary" title="切换焦糖和纸 / 暖炭暗夜">
           <span class="theme-dot" aria-hidden="true"></span>
           <span id="quick-theme-label" class="quick-theme-text">焦糖和纸</span>
         </button>
 
-        <button type="button" id="open-customizer-btn" class="editorial-pill-btn editorial-pill-primary hidden" title="阅读字体、字号与底纸设置">
+        <button type="button" id="open-customizer-btn" class="editorial-pill-btn editorial-pill-primary hidden" title="阅读字体、字号与底纸设置" aria-label="排版与底纸设置">
           <span style="font-family: var(--font-serif-display); font-weight: 600;">Aa</span>
-          <span>排版</span>
+          <span class="customizer-btn-text">排版</span>
         </button>
 
         <button type="button" id="mobile-menu-btn" class="editorial-pill-btn editorial-pill-secondary mobile-menu-btn" aria-label="展开导航菜单">
@@ -2961,7 +2908,7 @@
 
           <div class="profile-footer">
             <div class="profile-stats-line">
-              <span id="profile-post-count">3</span> 篇长文 · <span id="profile-note-count">4</span> 则短记
+              <span id="profile-post-count">5</span> 篇长文 · <span id="profile-note-count">7</span> 则短记
             </div>
             <div class="profile-actions-row">
               <a
@@ -3136,11 +3083,6 @@
             <span id="reader-bookmark-icon">☆</span>
             <span id="reader-bookmark-label">收藏备忘</span>
           </button>
-
-          <button type="button" id="reader-customizer-btn" class="editorial-pill-btn editorial-pill-primary">
-            <span style="font-family: var(--font-serif-display); font-weight: 600;">Aa</span>
-            <span>排版与底纸</span>
-          </button>
         </div>
       </div>
 
@@ -3241,7 +3183,7 @@
 
     <div class="drawer-group">
       <span class="eyebrow">底纸主题</span>
-      <div class="drawer-grid-3">
+      <div class="drawer-grid-2">
         <button type="button" data-drawer-theme="warm" class="drawer-theme-btn swatch-btn">
           <span class="swatch-circle" style="background: #f6f3ec;"></span>
           <span>焦糖和纸</span>
@@ -3249,10 +3191,6 @@
         <button type="button" data-drawer-theme="night" class="drawer-theme-btn swatch-btn">
           <span class="swatch-circle" style="background: #1b1a18;"></span>
           <span>暖炭暗夜</span>
-        </button>
-        <button type="button" data-drawer-theme="daylight" class="drawer-theme-btn swatch-btn">
-          <span class="swatch-circle" style="background: #f5f5f7;"></span>
-          <span>晴空昼白</span>
         </button>
       </div>
     </div>
@@ -3268,9 +3206,9 @@
           <div class="font-card-name">人文衬线</div>
           <div class="font-card-sub">Newsreader / 宋体</div>
         </button>
-        <button type="button" data-set-font="kai" class="font-opt-btn font-card-btn" style="font-family: 'LXGW WenKai', 'Kaiti SC', 'STKaiti', serif;">
+        <button type="button" data-set-font="kai" class="font-opt-btn font-card-btn" style="font-family: var(--font-kai);">
           <div class="font-card-name">温润楷书</div>
-          <div class="font-card-sub">文楷 / 系统楷体</div>
+          <div class="font-card-sub">系统楷体（本机装有文楷时优先）</div>
         </button>
         <button type="button" data-set-font="mono" class="font-opt-btn font-card-btn" style="font-family: var(--font-mono);">
           <div class="font-card-name">极客手记</div>
@@ -3396,7 +3334,7 @@
         },
         kai: {
           label: '温润楷书',
-          css: "'LXGW WenKai', 'Kaiti SC', 'STKaiti', 'KaiTi', Georgia, serif"
+          css: "var(--font-kai)"
         },
         mono: {
           label: '极客手记',
@@ -3406,8 +3344,7 @@
 
       const THEME_META = {
         warm: { label: '焦糖和纸' },
-        night: { label: '暖炭暗夜' },
-        daylight: { label: '晴空昼白' }
+        night: { label: '暖炭暗夜' }
       };
 
       const MOTION_META = {
@@ -3862,7 +3799,6 @@
           const tags = (post.tags || []).slice(0, 3).map(function (t) {
             return '<span class="tag-chip">' + escapeHtml(t) + '</span>';
           }).join('');
-          const firstPoint = Array.isArray(post.tldr) && post.tldr.length ? post.tldr[0] : '';
           return (
             '<article data-read-card="' + escapeHtml(post.id) + '" class="bento-tile bento-interactive bento-sheen archive-card">' +
               '<div style="display: flex; flex-direction: column; gap: 12px; position: relative; z-index: 2;">' +
@@ -3881,11 +3817,6 @@
                   '<button type="button" data-read-post="' + escapeHtml(post.id) + '">' + escapeHtml(post.title) + '</button>' +
                 '</h2>' +
                 '<p class="stream-summary" style="margin: 0;">' + escapeHtml(post.summary || post.subtitle) + '</p>' +
-                (firstPoint
-                  ? '<div style="padding: 10px 13px; border-radius: 14px; background: var(--bg-surface-secondary); border: 1px solid var(--hairline); font-size: 12.5px; line-height: 1.58; color: var(--text-secondary);">' +
-                      escapeHtml(firstPoint) +
-                    '</div>'
-                  : '') +
               '</div>' +
               '<div class="card-footer-row" style="position: relative; z-index: 2;">' +
                 '<div class="tag-row" style="margin-top: 0;">' + tags + '</div>' +
@@ -3920,6 +3851,7 @@
         const actualIdx = idx >= 0 ? idx : 0;
         const post = BLOG_POSTS[actualIdx];
         if (!post) return;
+        state.activePostId = post.id;
 
         document.getElementById('reader-issue-badge').textContent = post.issueNo;
         document.getElementById('reader-cat-badge').textContent = post.categoryLabel;
@@ -4034,7 +3966,7 @@
         state.mobileMenuOpen = false;
         document.getElementById('mobile-nav-panel').classList.add('hidden');
 
-        if (changed && state.prefs.motionLevel === 'full') {
+        if (changed && !options.initial && state.prefs.motionLevel === 'full') {
           const shutter = document.getElementById('shutter-wipe');
           shutter.classList.remove('is-passing');
           void shutter.offsetWidth;
@@ -4063,11 +3995,214 @@
         if (nextView === 'reader') renderReaderView();
 
         syncParticlesState();
+        syncHeadMeta(nextView, options);
+        if (!options.fromHistory) syncUrl(nextView, Boolean(options.initial));
 
         if (!options.keepScroll) {
           window.scrollTo({ top: 0, behavior: state.prefs.motionLevel === 'none' ? 'auto' : 'smooth' });
         }
         updateScrollProgressAndTOC();
+      }
+
+      // ==================== ROUTING ====================
+      // 每篇文章有独立 URL：/posts/<slug>/（slug = id 去掉 post- 前缀），归档为 /archive/。
+      // 构建脚本会为这些路径生成同一份外壳的静态页面；file:// 本地预览时不改地址栏。
+      const SITE_TITLE = 'Caramelized Notes · 焦糖笔记 — CaramelizedCUDA';
+      const ARCHIVE_TITLE = '文章归档 — 焦糖笔记';
+      const SITE_DESCRIPTION = '焦糖笔记：CaramelizedCUDA 的个人技术博客。记录系统与桌面端排障、架构与工具拆解，以及案头阅读与随笔。';
+      const ARCHIVE_DESCRIPTION = '焦糖笔记的全部文章：系统与桌面端排障、架构与工具、设计与随笔。';
+      const POST_TIMEZONE = '+08:00';
+      const DEFAULT_SITE_ORIGIN = 'https://caramelizedcuda.github.io';
+      const SITE_ORIGIN = (function () {
+        if (typeof document !== 'undefined' && typeof document.querySelector === 'function') {
+          const link = document.querySelector('link[rel="canonical"]');
+          const href = link && link.getAttribute ? link.getAttribute('href') : '';
+          const m = /^https?:\/\/[^/]+/i.exec(href || '');
+          if (m) return m[0];
+        }
+        return DEFAULT_SITE_ORIGIN;
+      })();
+      const ROUTING_ENABLED = location.protocol === 'http:' || location.protocol === 'https:';
+
+      function postSlug(postId) {
+        return String(postId).replace(/^post-/, '');
+      }
+
+      function pathForView(view) {
+        if (view === 'blog') return '/archive/';
+        if (view === 'reader' && state.activePostId && BLOG_POSTS.some(function (p) { return p.id === state.activePostId; })) {
+          return '/posts/' + encodeURIComponent(postSlug(state.activePostId)) + '/';
+        }
+        return '/';
+      }
+
+      function parseRoute(pathname) {
+        const postMatch = /^\/posts\/([^/]+)\/?$/.exec(pathname);
+        if (postMatch) {
+          let slug = postMatch[1];
+          try { slug = decodeURIComponent(slug); } catch (err) { /* keep raw */ }
+          const postId = 'post-' + slug;
+          if (BLOG_POSTS.some(function (p) { return p.id === postId; })) {
+            return { view: 'reader', postId: postId };
+          }
+          return { view: 'home' };
+        }
+        if (/^\/archive\/?$/.test(pathname)) return { view: 'blog' };
+        return { view: 'home' };
+      }
+
+      function resolveMetaImageUrl(rawCover) {
+        if (!rawCover) return '';
+        if (/^https?:\/\//i.test(rawCover)) return rawCover;
+        if (rawCover.charAt(0) === '/') return SITE_ORIGIN + rawCover;
+        if (typeof IMAGE_ASSET_PATHS === 'object' && IMAGE_ASSET_PATHS && typeof IMAGES === 'object' && IMAGES) {
+          const keys = Object.keys(IMAGE_ASSET_PATHS);
+          for (let i = 0; i < keys.length; i++) {
+            const key = keys[i];
+            if (IMAGES[key] === rawCover) return SITE_ORIGIN + IMAGE_ASSET_PATHS[key];
+          }
+        }
+        return '';
+      }
+
+      function routeMetaForView(view) {
+        if (view === 'reader') {
+          const post = BLOG_POSTS.find(function (p) { return p.id === state.activePostId; });
+          if (post) {
+            return {
+              title: post.title + ' — 焦糖笔记',
+              ogTitle: post.title,
+              description: post.summary || post.subtitle || SITE_DESCRIPTION,
+              url: SITE_ORIGIN + '/posts/' + encodeURIComponent(postSlug(post.id)) + '/',
+              type: 'article',
+              imageUrl: resolveMetaImageUrl(post.cover),
+              published: post.date + 'T00:00:00' + POST_TIMEZONE,
+              modified: post.updated ? post.updated + 'T00:00:00' + POST_TIMEZONE : null,
+              tags: Array.isArray(post.tags) ? post.tags : []
+            };
+          }
+        }
+        if (view === 'blog') {
+          return {
+            title: ARCHIVE_TITLE,
+            ogTitle: ARCHIVE_TITLE,
+            description: ARCHIVE_DESCRIPTION,
+            url: SITE_ORIGIN + '/archive/',
+            type: 'website',
+            imageUrl: resolveMetaImageUrl(IMAGES.windowStudy),
+            published: null,
+            modified: null,
+            tags: []
+          };
+        }
+        return {
+          title: SITE_TITLE,
+          ogTitle: SITE_TITLE,
+          description: SITE_DESCRIPTION,
+          url: SITE_ORIGIN + '/',
+          type: 'website',
+          imageUrl: resolveMetaImageUrl(IMAGES.windowStudy),
+          published: null,
+          modified: null,
+          tags: []
+        };
+      }
+
+      function upsertHeadElement(head, selector, tagName, matchAttrs, valueAttr, valueVal) {
+        let el = head.querySelector(selector);
+        if (!el) {
+          el = document.createElement(tagName);
+          Object.keys(matchAttrs).forEach(function (attrName) {
+            el.setAttribute(attrName, matchAttrs[attrName]);
+          });
+          head.appendChild(el);
+        }
+        el.setAttribute(valueAttr, valueVal);
+        return el;
+      }
+
+      function appendHeadMeta(head, propName, val) {
+        const el = document.createElement('meta');
+        el.setAttribute('property', propName);
+        el.setAttribute('content', val);
+        head.appendChild(el);
+        return el;
+      }
+
+      function syncHeadMeta(view, opts) {
+        const options = opts || {};
+        const meta = routeMetaForView(view);
+        document.title = meta.title;
+
+        const head = document.head || (typeof document.getElementsByTagName === 'function' ? document.getElementsByTagName('head')[0] : null);
+        if (!head || typeof head.querySelector !== 'function' || typeof document.createElement !== 'function') {
+          return;
+        }
+
+        if (!options.initial) {
+          const robotsMeta = head.querySelector('meta[name="robots"]');
+          if (robotsMeta && robotsMeta.parentNode) robotsMeta.parentNode.removeChild(robotsMeta);
+        }
+
+        upsertHeadElement(head, 'link[rel="canonical"]', 'link', { rel: 'canonical' }, 'href', meta.url);
+        upsertHeadElement(head, 'meta[name="description"]', 'meta', { name: 'description' }, 'content', meta.description);
+        upsertHeadElement(head, 'meta[property="og:type"]', 'meta', { property: 'og:type' }, 'content', meta.type);
+        upsertHeadElement(head, 'meta[property="og:title"]', 'meta', { property: 'og:title' }, 'content', meta.ogTitle);
+        upsertHeadElement(head, 'meta[property="og:description"]', 'meta', { property: 'og:description' }, 'content', meta.description);
+        upsertHeadElement(head, 'meta[property="og:url"]', 'meta', { property: 'og:url' }, 'content', meta.url);
+
+        if (meta.imageUrl) {
+          upsertHeadElement(head, 'meta[property="og:image"]', 'meta', { property: 'og:image' }, 'content', meta.imageUrl);
+          upsertHeadElement(head, 'meta[name="twitter:card"]', 'meta', { name: 'twitter:card' }, 'content', 'summary_large_image');
+        } else {
+          const ogImage = head.querySelector('meta[property="og:image"]');
+          if (ogImage && ogImage.parentNode) ogImage.parentNode.removeChild(ogImage);
+          upsertHeadElement(head, 'meta[name="twitter:card"]', 'meta', { name: 'twitter:card' }, 'content', 'summary');
+        }
+
+        if (typeof head.querySelectorAll === 'function') {
+          const staleArticleTags = head.querySelectorAll('meta[property^="article:"]');
+          for (let i = 0; i < staleArticleTags.length; i++) {
+            const node = staleArticleTags[i];
+            if (node && node.parentNode) node.parentNode.removeChild(node);
+          }
+        }
+        if (meta.type === 'article') {
+          if (meta.published) appendHeadMeta(head, 'article:published_time', meta.published);
+          if (meta.modified) appendHeadMeta(head, 'article:modified_time', meta.modified);
+          meta.tags.forEach(function (tag) {
+            appendHeadMeta(head, 'article:tag', tag);
+          });
+        }
+      }
+
+      function syncDocumentTitle(view) {
+        syncHeadMeta(view);
+      }
+
+      function syncUrl(view, replace) {
+        if (!ROUTING_ENABLED) return;
+        const path = pathForView(view);
+        if (!replace && location.pathname === path) return;
+        try {
+          const entry = { view: view, postId: state.activePostId };
+          if (replace) {
+            history.replaceState(entry, '', path + location.hash);
+          } else {
+            history.pushState(entry, '', path);
+          }
+        } catch (err) {
+          // History API unavailable: keep in-memory navigation working
+        }
+      }
+
+      function applyRoute(route, opts) {
+        if (route.postId) {
+          state.activePostId = route.postId;
+          state.mobileTocOpen = false;
+          document.getElementById('reader-mobile-toc-panel').classList.add('hidden');
+        }
+        switchView(route.view, opts);
       }
 
       function openPostInReader(postId) {
@@ -4272,9 +4407,6 @@
             if (theme === 'night') {
               ctx.fillStyle = 'rgba(224, 130, 99, ' + (pt.alpha * 0.85) + ')';
               ctx.arc(pt.x, pt.y, pt.r, 0, Math.PI * 2);
-            } else if (theme === 'daylight') {
-              ctx.fillStyle = 'rgba(255, 252, 240, ' + pt.alpha + ')';
-              ctx.arc(pt.x, pt.y, pt.r, 0, Math.PI * 2);
             } else {
               ctx.fillStyle = 'rgba(255, 236, 210, ' + pt.alpha + ')';
               ctx.arc(pt.x, pt.y, pt.r, 0, Math.PI * 2);
@@ -4309,7 +4441,7 @@
         });
 
         document.getElementById('quick-theme-btn').addEventListener('click', function () {
-          const order = ['warm', 'night', 'daylight'];
+          const order = ['warm', 'night'];
           const next = order[(order.indexOf(state.prefs.theme) + 1) % order.length];
           state.prefs.theme = next;
           applyPrefsToDOM();
@@ -4318,9 +4450,6 @@
         });
 
         document.getElementById('open-customizer-btn').addEventListener('click', function () {
-          toggleCustomizer(true);
-        });
-        document.getElementById('reader-customizer-btn').addEventListener('click', function () {
           toggleCustomizer(true);
         });
         document.getElementById('close-customizer-btn').addEventListener('click', function () {
@@ -4629,6 +4758,10 @@
         });
 
         document.addEventListener('visibilitychange', syncParticlesState);
+        window.addEventListener('popstate', function () {
+          if (!ROUTING_ENABLED) return;
+          applyRoute(parseRoute(location.pathname), { fromHistory: true });
+        });
         window.addEventListener('scroll', updateScrollProgressAndTOC, { passive: true });
         window.addEventListener('resize', function () {
           resizeHeroCanvas();
@@ -4641,7 +4774,7 @@
         initStaticImages();
         bindEvents();
         applyPrefsToDOM();
-        switchView('home', { keepScroll: true });
+        applyRoute(ROUTING_ENABLED ? parseRoute(location.pathname) : { view: 'home' }, { keepScroll: true, initial: true });
         resizeHeroCanvas();
         syncParticlesState();
       });

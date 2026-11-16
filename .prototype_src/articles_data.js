@@ -1,5 +1,714 @@
       const BLOG_POSTS = [
         {
+          id: "post-yan-pr75-macos",
+          issueNo: "ISSUE 05",
+          pinned: false,
+          category: "architecture",
+          categoryLabel: "架构与工具",
+          title: "给上游收一个 macOS 的尾：#75 解冲突、接沙箱与把证据做实",
+          subtitle: "一个并行推进中的开源 PR，不仅需要注意写新代码，而且当上游先你一步改了同一块地基时，要进行及时的处理。这篇记录一次「不扩大功能范围」的收尾：合并最新 main、把 macOS 严档的 sandbox-exec 写盘约束重新挂回现行执行链路、统一文档与界面口径，以及把验证证据做成分层的、经得起复核的东西。",
+          summary: "记录「言」PR #75 合入前的收尾实战：解冲突时完整保留上游新增的 scopedRoute 存储根代次校验与 onMove 通知，将 macOS 严档 /usr/bin/sandbox-exec (seatbelt) 写盘白名单挂回三条 spawn 路径，用 watchBackground 消除 Windows 下 EBUSY/rmdir 44ms 进程退出竞态，并通过 Git Data API 闭环 workflow 权限与推送 actor 门禁。",
+          date: "2026-11-16",
+          readMinutes: 8,
+          wordCount: "4,712 字符",
+          cover: IMAGES.ogPr75Macos,
+          tags: ["macOS","sandbox-exec","竞态排障","Git Data API"],
+          specimen: {
+            eyebrow: "CAUSAL SEAM #05 · shell.js & watchBackground",
+            title: "严档接入 seatbelt 写盘白名单与进程退出同步",
+            context: "仅罩严档「问而后行」，且测试清理须等子进程 close 而非只看文件落地",
+            lines: [
+              { type: 'ctx', text: "macBox = MAC_SEATBELT && boxed && seatbelt && process.platform === \"darwin\";" },
+              { type: 'del', text: "轮询 result.txt 存在即 rmSync(root) → 子进程晚 44ms 退出报 EBUSY" },
+              { type: 'ins', text: "spawn(\"/usr/bin/sandbox-exec\", [\"-p\", profile, \"/bin/sh\", \"-c\", command]) + watchBackground" }
+            ],
+            proof: "macOS arm64 原生 E2E 1296/0 + 同命令三分档对照（严档 EPERM 拒写）+ 四项 CI 全绿（Win 1314 / Mac 1305）合入上游"
+          },
+          tldr: [
+            "解冲突先护上游新契约：完整保留 server/store.js 新增的 scopedRoute 存储根代次校验、background() 值守与 onMove 通知，零冲突合并文件同样逐行按 diff 核对。",
+            "seatbelt 接回现行链路：仅在严档（strictBox）启用 /usr/bin/sandbox-exec 将写盘收进工作目录与必要工具链缓存，缺失二进制时静默退回 /bin/sh。",
+            "消除 Windows 清理竞态：result.txt 落地后 PowerShell 子进程晚约 44ms 才退出触发 EBUSY/rmdir，改挂 watchBackground 等进程级 close 信号后再删目录。",
+            "三层证据与身份闭环：分层给出本机静态、四项 CI 与 macOS 真机探针（运行时拼路径三分档对照 + 内核日志），并用 Git Data API 重建同 tree 提交跨过 workflow scope 与首次贡献者审批卡点。"
+          ],
+          boundaryNote: "边界留底：seatbelt 仅收严档写盘，读与联网照旧，缺失 sandbox-exec 时静默降级为静态筛查；ps 不可见 sandbox-exec 属 exec 替换常态；macOS 端到端固定验证 Chrome，Edge 未验。",
+          footnote: "核验基准：「言」PR #75（合入提交 bde519b，2026-11-16）；覆盖本机静态检查、四项 CI（Windows E2E 1314、macOS E2E 1305）与 macOS arm64 真机 seatbelt 探针。",
+          sections: [
+            {
+              id: "pr75-sec-1",
+              heading: "背景",
+              html: `
+                <p>项目是 yan（本地聊天前端 + 轻量代码 Agent），上游的取舍很明确：<strong>Windows 为准，macOS 只求能用，Linux 不支持</strong>。<a href="https://github.com/Master-Norna/yan/pull/75" target="_blank" rel="noopener noreferrer">PR #75</a> 做 macOS 基础适配，四块内容：</p>
+                <ul>
+                  <li>macOS 严档（「问而后行」）沙箱在静态筛查之外，用系统自带的 <code>/usr/bin/sandbox-exec</code>（seatbelt）把写盘收进工作目录；</li>
+                  <li>「环境」工具包在 macOS 上降级为说明 + 桥接报错（它只备了 Windows 版）；</li>
+                  <li>存储位置条子按平台落位（macOS 写 <code>~/Library/Application Support/言/位置.json</code>，并兼容清理早前误写进 <code>%APPDATA%</code> 路径的旧条子）；</li>
+                  <li>文档与测试的配套修正。</li>
+                </ul>
+                <p>挂在 review 阶段时，上游 main 先后合进了几笔同地基的改动：#17 补齐 macOS 沙箱筛查、#87/#89 修沙箱参数识别，以及一组存储根切换修复——<code>server/store.js</code> 里长出了 <code>scopedRoute</code>（存储根代次校验）、<code>background()</code> 值守和 <code>onMove</code> 通知。维护者复核后给了三条明确意见：存储位置修复已通过、冲突要解且不许盖掉这些新逻辑、文档说的和界面做的要统一。</p>
+              `
+            },
+            {
+              id: "pr75-sec-2",
+              heading: "修复思路",
+              html: `
+                <h3 id="pr75-h3-1">一、先读复核意见，再读合并结果</h3>
+                <p>这轮最重要的动作顺序是：<strong>先把维护者最新一条 review 吃透，再去看 diff</strong>。三条意见里两条是关于「什么不能动」的：根代次校验、<code>onMove</code> 通知是上游刚修好的东西，解冲突时任何「顺手简化」都是在回退别人的修复。</p>
+                <p>真正冲突的只有 <code>server/store.js</code> 一个文件、两处，而且都是签名级：工厂函数签名并入了 <code>background</code>/<code>onMove</code>，<code>handleMove</code> 从 <code>jsonRoute</code> 换成了 <code>scopedRoute</code>。但「文本上合得上」不等于「语义上对」——合并工具自动拼好的部分，我逐行核对过：<code>revision</code> 代次、<code>scopedRoute</code> 包裹、<code>background()</code> 值守都在，且分支的 <code>MAC</code> 平台常量没被吃掉。</p>
+                <p><strong>经验：merge 不冲突的文件也要当 diff 读。</strong> 这次 <code>server/work/index.js</code> 自动合并零冲突，但我要确认的不是「合上了」，而是「seatbelt 在新链路里仍然只在严档生效」。</p>
+                <h3 id="pr75-h3-2">二、seatbelt 接回现行链路，而不是新起一条</h3>
+                <p>seatbelt 的接入点选在上游现有的分档逻辑上，一行：</p>
+                <div class="code-figure">
+                  <div class="code-figure-bar">
+                    <span class="code-lang">JavaScript</span>
+                    <button type="button" class="code-copy-btn">复制代码</button>
+                  </div>
+                  <pre><code>seatbelt = strictBox(body);   // sandbox:true 且非宽档 —— 即严档「问而后行」</code></pre>
+                </div>
+                <p>然后三条执行路径透传下去：前台 <code>runShell</code>、带 ticket 转后台的 <code>runForeground</code>、直接后台的 <code>startBackground</code>，最终都进 <code>spawnJob</code> → <code>spawnShell</code>。真正换实现的只有一行 spawn：</p>
+                <div class="code-figure">
+                  <div class="code-figure-bar">
+                    <span class="code-lang">JavaScript</span>
+                    <button type="button" class="code-copy-btn">复制代码</button>
+                  </div>
+                  <pre><code>macBox = MAC_SEATBELT &amp;&amp; boxed &amp;&amp; seatbelt &amp;&amp; process.platform === "darwin";
+// macBox 时:spawn("/usr/bin/sandbox-exec", ["-p", profile, "/bin/sh", "-c", command])
+// 否则照旧:/bin/sh -c</code></pre>
+                </div>
+                <p>两个刻意的取舍：</p>
+                <ul>
+                  <li><strong>只罩严档</strong>。审而后行、径行依旧只走规则筛查——上游的权限分档是产品决策，技术方案不能越权替它扩成「全平台进程隔离」；</li>
+                  <li><strong>缺失即静默降级</strong>（<code>fs.existsSync("/usr/bin/sandbox-exec")</code> 不满足就退回 <code>/bin/sh</code>），不引入新依赖。</li>
+                </ul>
+                <p>seatbelt profile 本身是「<code>(allow default)</code> + 对写盘按白名单 deny」：工作目录（过 <code>realpath</code>，防软链绕过）、<code>$TMPDIR</code>/<code>/tmp</code>/<code>/private/var/folders</code>、<code>/dev</code>，以及 <code>~/.npm</code>、<code>~/Library/Caches</code>、<code>~/.cargo</code>、<code>~/.m2</code> 这类工具链缓存。放缓存不是宽纵，是「求能用」——Node/Python 的包管理器不写缓存就没法干活。</p>
+                <h3 id="pr75-h3-3">三、文档说的和界面做的，统一成界面做的</h3>
+                <p>维护者点的第三处：docs 写 macOS 上环境页会「禁用准备」，<code>envStatusHtml</code> 里按钮实际只在任务运行中才 disabled——不支持的平台按钮可点，点了由桥接的 <code>handlePrepare</code> 同步抛 Windows-only 错。</p>
+                <p>两个方向都能选：改 UI 真禁掉，或改文档照实写。选后者，理由：行为已经在维护者上一轮复核里被默认认可过（PR 正文就写着「按钮可点」），改文档是单点收敛，改 UI 是二次动行为。四份文件中英对齐改口径：<strong>标注「仅 Windows」、「准备环境」仍可点、由桥接报这个错</strong>。</p>
+                <p><strong>经验：文档与行为不一致时，先问「哪个是被 review 过的行为」。</strong> 被复核过的行为是契约，文档向它对齐；只有行为本身错了才改代码。</p>
+                <h3 id="pr75-h3-4">四、文件落地不等于进程退出：清理要等任务真结束</h3>
+                <p>合入前最后一轮复核，问题出在测试自己身上，而且只在 Windows 上看得见。</p>
+                <p>早前为修偶发失败，已交付分支的固定等待被改成了轮询 <code>result.txt</code> 是否存在。维护者本机复验抓到：文件出现不代表写它的 PowerShell 已退出——随后 <code>finally</code> 里 <code>fs.rmSync(root)</code> 时，进程仍以 root 为当前目录，Windows 报 <code>EBUSY/rmdir</code>，646 过 1 败，独苗就是这条清理。插桩显示清理开始时 <code>backgroundRunning()</code> 仍为 true，子进程 <code>close</code> 晚约 44 ms 才到，退出码 0。</p>
+                <p>修复顺着现成的桥接接口走，不新造等待原语：测试服务器加挂 <code>POST /api/work/watch</code>，用例里凭 run 响应已交付的 <code>id/key</code> 发一次 watch。<code>watchBackground</code> 挂在 <code>job.ended</code> 上，它 resolve 于 child 的 <code>close</code>，而 <code>close</code> 必在 <code>exit</code> 之后——watch 正常返回即证明写盘进程真正退出，再进清理。结果文件的断言原样保留，固定等待不扩大，cancel 分支不动（那条拿不到 id/key，且进程是被 <code>killTree</code> 收的，语义上也没有「等它自然结束」可等）。</p>
+                <p><strong>经验：文件系统只能证明文件被写过，证明不了写它的进程退了没有。</strong> 要等「进程级」的结束，就得用进程级的信号（exit/close）；文件存在、mtime、输出静默都只是代理证据。另一个对照也值得记下：这一轮被抓的不是 macOS 适配代码，而是 Windows 上的测试竞态——分层验证的缺口不只在「缺真平台」，也在「每个平台有各自才照得见的坑」。</p>
+              `
+            },
+            {
+              id: "pr75-sec-3",
+              heading: "验证：把「确实生效」做成三层证据",
+              html: `
+                <p>上游上一轮的复核是在 Windows 上做的，存储测试靠模拟平台——所以这次把证据分了层，每层标清它到底证明了什么：</p>
+                <div class="table-scroll">
+                  <table>
+                    <thead><tr><th>层</th><th>做了什么</th><th>证明了什么</th></tr></thead>
+                    <tbody>
+                      <tr><td>本机静态</td><td><code>npm run check</code>、<code>npm run unit</code>、prettier</td><td>类型、644 项单测、格式；macOS 分支在 Linux 上不执行，这层只管平台无关正确性</td></tr>
+                      <tr><td>CI</td><td>Windows 单测·类型·格式 / Windows 端到端 / Node 22 单测 / macOS 测试</td><td>合入后不破坏挡合并的两道 Windows 门，macOS 参考项绿</td></tr>
+                      <tr><td>macOS 原生</td><td>arm64 机器上 check/unit/<strong>E2E 1296 过 0 败</strong> + 运行时探针</td><td>真平台、真 Chrome、真 seatbelt</td></tr>
+                    </tbody>
+                  </table>
+                </div>
+                <p>第三层的关键是<strong>证明拦截来自 seatbelt 而非静态筛查</strong>。做法是三组对照，写盘路径用 <code>os.homedir()</code> 在运行时才拼出来——静态筛查从字面上看不见它：</p>
+                <ul>
+                  <li>严档 <code>sandbox:true</code> → <code>EPERM: operation not permitted</code>，文件没落盘；</li>
+                  <li>宽档 <code>permission:"auto"</code> → 写出成功；</li>
+                  <li><code>sandbox:false</code> → 写出成功。</li>
+                </ul>
+                <p>同一命令、只差分档，拒绝就只可能来自严档多出来的那一层 seatbelt。外加内核日志里 <code>sandbox-exec[pid]</code> 的 unnest 记录佐证二进制确实被调用。</p>
+                <p>有一处如实说明值得单独写：<code>ps</code> 里<strong>看不到</strong> <code>sandbox-exec</code> 进程。它是 shim——<code>sandbox_init</code> 之后直接 exec 成 <code>/bin/sh</code>，没有驻留的 wrapper。如果验收标准要求「进程列表里出现 sandbox-exec」这种字面证据，当前实现形态下它不存在；能给出且足够的，是行为差异加内核日志。<strong>经验：先想清楚什么证据形态是可能的，再去设计验证，比事后被质疑证据不够省一整轮。</strong></p>
+              `
+            },
+            {
+              id: "pr75-sec-4",
+              heading: "工程侧踩到的一个身份坑",
+              html: `
+                <p>这次还解决了一个和代码无关、但会卡住整个流程的问题：<strong>推送者与提交作者是两回事，而 GitHub 对它们各有一套检查。</strong></p>
+                <ul>
+                  <li>提交署名约束：上游不接受 agent 署名，所有提交的 author/committer 都必须是用户本人 noreply；</li>
+                  <li>推送被拒：本地 PAT 是 classic、<code>public_repo</code> only——这次合并带进了上游对 <code>.github/workflows</code> 的改动，<strong>没有 <code>workflow</code> scope 的 token 推送任何包含 workflow 变更的提交都会被 receive-pack 拦下</strong>，<code>refusing to allow a Personal Access Token to create or update workflow ... without 'workflow' scope</code>；</li>
+                  <li>走了另一条路推上去后，新坑出现：推送者身份变了，GitHub 把该 PR 的 workflow run 判为「首次贡献者需批准」，CI 直接 <code>action_required</code>、0 个 job。</li>
+                </ul>
+                <p>最终的解法是用 <strong>Git Data API 以用户身份重建提交对象</strong>：同一个 tree、同一对 parents（合入双方的 head）、同一句 commit message，author/committer 写用户 noreply，只让 committer date 变成当下——得到一个内容逐字节相同但 SHA 不同的合并提交，再用 <code>PATCH /git/refs/heads/...</code> 更新分支 ref。ref 更新的 actor 变成用户本人，PR 触发新一轮 synchronize 事件，CI 自动放行。</p>
+                <p><strong>经验三条</strong>：</p>
+                <ol>
+                  <li>「推送者 ≠ 作者」——GitHub 的贡献者统计看提交作者，但 workflow 批准门槛看推送事件的 actor；</li>
+                  <li>PAT 的 <code>workflow</code> scope 是独立权限，专管 <code>.github/workflows</code> 下的任何变更，老 token 特别容易在这上面翻车；</li>
+                  <li>Git Data API 建提交走的是另一套校验路径，可以在需要「内容不变、身份换一下」的场景救场——但前提是你能保证 tree 与 parents 重建得分毫不差。</li>
+                </ol>
+              `
+            },
+            {
+              id: "pr75-sec-5",
+              heading: "边界，照实留",
+              html: `
+                <ul>
+                  <li>seatbelt 只收<strong>写盘</strong>；读与联网照旧，这一点文档有明示；</li>
+                  <li>sandbox-exec 缺失时静默降级，此时严档只剩静态筛查；</li>
+                  <li>macOS 上验证固定 Chrome，Edge 未验；</li>
+                  <li>「macOS 只求能用」意味着没有承诺进程级隔离——静态筛查的已知洞（脚本内动态拼路径之外，还有藏字、进程脱离树等）不因 seatbelt 而消失，它只是把其中最影响日常的一类（写盘）收住了。</li>
+                </ul>
+              `
+            },
+            {
+              id: "pr75-sec-6",
+              heading: "收尾",
+              html: `
+                <p>最终状态：两轮复核的意见逐条落地——冲突干净解掉，<code>scopedRoute</code>/代次校验/<code>onMove</code> 原位保留，文档与界面口径统一，测试竞态按「watch 等进程退出」修掉，功能零扩张；四项 CI 全绿（Windows 端到端 1314、macOS 端到端 1305），seatbelt 三层证据齐全。<strong>PR #75 已合入上游。</strong></p>
+                <p>这一类工作的体感是：<strong>收尾比新写更考验纪律</strong>——读复核、守取舍、让每一次验证都能回答「你到底证明了什么」；当使用devin这样的cloud agent环境进行开发时，对于上传推送需要进行额外的配置，将它当作自己在本地做好了之后推送上去的流程来处理是不正确的；PR 是 #75，代码在 yan。</p>
+              `
+            }
+          ]
+        }
+,
+        {
+          id: "post-macos-sandbox",
+          issueNo: "ISSUE 03",
+          pinned: false,
+          category: "architecture",
+          categoryLabel: "架构与工具",
+          title: "给 AI Agent 补齐 macOS 静态沙箱：从一张规则表到跨 Shell 扫描器",
+          subtitle: "给「言」的 Node.js 本机桥接补齐 macOS 指令筛查（Issue #16 / PR #17），动工前以为只是照着 Windows 规则表补上 launchctl、defaults 和 rsync。真正写进共用扫描器之后，/bin/sh 与 PowerShell 的语法差异一路撞出了包装词逃逸、# don't 落单撇号吞指令、同步热路径 16.4 秒卡死、外层 $() 抢先求值，以及块注释吃掉右括号一连串硬骨头。",
+          summary: "复盘「言」PR #17（4e44763 / 合入 3414c84）：从本机桥接四道筛查分工出发，拆解 macOS 动作规则与 sudo 整词反例、rsync/sed 参数 UTF-16 局部抹白、三视图线性扫描器压平三次复杂度退化、外层 PowerShell $() 求值顺序，以及 <#...#> 块注释遮蔽右括号的受限补查与四层验收证据。",
+          date: "2026-11-14",
+          readMinutes: 28,
+          wordCount: "19,720 字符",
+          cover: IMAGES.lanternReading,
+          tags: ["Node.js","沙箱安全","PowerShell","回归矩阵"],
+          specimen: {
+            eyebrow: "CAUSAL SEAM #03 · server/sandbox.js",
+            title: "块注释结尾 # 误作行注释吞掉双引号 $() 右括号",
+            context: "PR #17（4e44763）对 PowerShell 点调用与 <# ... #> 块注释的受限补查（较 fe78d08 两文件 +74/-18）",
+            lines: [
+              { type: 'ctx', text: "echo \"$(. <# ordinary comment #> Invoke-Expression $s)\"" },
+              { type: 'del', text: "commentAt 将 #> 误判为行注释起点，吞掉 ) 导致整段 $() 被遮成 \\x01" },
+              { type: 'ins', text: "return !dotComments && scanned.source.includes(\"<#\") && hasHiddenCommand(shellText(..., true), true);" }
+            ],
+            proof: "入库回归矩阵实测：fe78d08 (31/1) → 首版块注释候选 (31/1) → 最终 4e44763 (32/0) + 13,561 条回放零漂移"
+          },
+          tldr: [
+            "定位与分工：server/sandbox.js 在 child_process.spawn 之前做纯函数静态筛查，命中后返回中文原因供请示或改写；系统级 sandbox-exec 写盘隔离在后续 PR #75 另行接入。",
+            "动作识别与 sudo 反例：macOS 工具按「修改子命令拒、查询子命令放」并入共用 RULES；唯独 sudo 因包装词列不完，改为在剥去引号的 unquoted 视图上整词拦截。",
+            "参数角色与平台门禁：rsync、ditto、sed -i 按 UTF-16 区间局部抹白只读来源；withoutDataStream 保留 win32 门禁，避免误截 POSIX 带冒号文件名。",
+            "三视图线性扫描：用倒序 Int32Array 收尾表加显式栈单趟产出 text / syntax / unquoted 视图，消掉三次复杂度退化，并按真实求值顺序先扫外层 PowerShell 双引号 $() 再扫内层 bash -c。",
+            "收官回归与分层验收：纠偏 . Invoke-Expression 回归归类后，用默认关闭的 dotComments 解决 <# ... #> 遮蔽双引号 $() 配对（较 fe78d08 两文件 +74/-18），经 31/1 → 32/0 红绿矩阵、四项 CI 与 13,561 条回放合入 3414c84。"
+          ],
+          boundaryNote: "事实边界：纯函数静态筛查不隔离子进程（macOS 严档 sandbox-exec 写盘收口见 PR #75）；沿用「回归必修、main 旧缺口不追补」范围；仓库保持 Windows-first，POSIX 分支不承诺 Linux 支持。",
+          footnote: "核验基准：「言」PR #17 最终 head 4e44763 / 上游 squash 提交 3414c84（2026-11-14 合入）；本地参考验证环境 macOS 26.6.2 arm64 / Node 24.21.0。危险命令样本仅作字符串传入筛查纯函数，未执行系统修改动作。",
+          sections: [
+            {
+              id: "sandbox-sec-1",
+              heading: "1. 先看地基：这层沙箱在桥接里怎么接",
+              html: `
+                <p>动手加规则前，先顺清楚「言」原本的执行链路。模型发出的 Shell 指令和文件操作都经过本机 Node.js 桥接（只监听 <code>127.0.0.1</code>），路由入口在 <a href="https://github.com/Master-Norna/yan/blob/3414c84e5cc136b2a7b22a83851ed8b3e15ad80d/server/work/index.js" target="_blank" rel="noopener noreferrer"><code>server/work/index.js</code></a>：</p>
+                <div class="code-figure">
+                  <div class="code-figure-bar">
+                    <span class="code-lang">JavaScript · server/work/index.js（handleWorkRun 节选，Line 132-146）</span>
+                    <button type="button" class="code-copy-btn">复制代码</button>
+                  </div>
+                  <pre><code>// server/work/index.js（handleWorkRun 节选，Line 132-146）
+const guarded = sandbox.screenStoreCommand(command, storeRoot(), workdir);
+if (guarded) throw Error(guarded);
+const boxed = body.sandbox === true,
+  reviewed = body.permission === "review" &amp;&amp; body.reviewed === true;
+const unreviewable = reviewed &amp;&amp; sandbox.screenUnreviewable(command);
+if (unreviewable) throw Error(\`审查拒绝：\${unreviewable}\`);
+if (boxed &amp;&amp; !reviewed) {
+  const why = looseTier(body)
+    ? sandbox.screenLoose(command)
+    : sandbox.screenCommand(command, workdir);
+  if (why) throw Error(why);
+}
+if (body.permission === "review" &amp;&amp; !reviewed) {
+  const why = sandbox.screenAutoReview(command);
+  if (why) throw Error(why);
+}</code></pre>
+                </div>
+                <p>这套原有的防护底座分成几块各自守门：</p>
+                <ul>
+                  <li><strong>存储根保护（<code>screenStoreCommand</code> / <code>screenStorePath</code>）</strong>：不管前端开没开沙箱、选了哪档权限，先挡住对「言」自身存储目录里 <code>配置.json</code>、<code>配置备份</code> 和 <code>ChatGPT 登录.json</code> 的读写，避免模型把 API Key 读走拼进 URL 外传，或自己改写配置关掉沙箱。</li>
+                  <li><strong>审查兜底线（<code>screenUnreviewable</code>）</strong>：在「审而后行」模式下，即使另一路审查模型放行，仍有两件事直接拒掉——一是调「言」自己的本机桥接端口（<code>localhost:8787</code>，含 <code>:08787</code> 前导零写法，因为执事接口只认 <code>reviewed: true</code> 而不验沙箱，调它等于自己给自己盖章）；二是编码、拼接、管道喂 Shell 这类「藏字」指令，审查模型看不懂实际内容，放行只能盲猜。</li>
+                  <li><strong>严、宽两档沙箱与自动审查规则</strong>：
+                    <ul>
+                    <li><code>screenCommand</code>（严档，给「问而后行」）：守住工作目录外写入、<code>.env</code>/密钥读写、<code>.git</code> 内部修改以及非本机的直接外联；整机只读查看放行，方便模型排查系统环境。被拦下的命令会带着原因在界面浮出「请示」，用户批了就单条出沙箱执行。</li>
+                    <li><code>screenLoose</code>（宽档，给「审而后行」与「径行」）：放开目录外写、联网、读 <code>.env</code> 和改 <code>.git</code>，只守服务、账户、磁盘、防火墙、提权、藏字、别名，以及往 <code>Windows</code>、<code>Program Files</code>、<code>/System</code>、<code>/usr</code> 这类系统目录写入。</li>
+                    <li><code>screenAutoReview</code>（审档）：「审而后行」未开审查模型或审查连不上时的规则闸门，在宽档基础上多拦 <code>rm -rf *</code> 等整目录/通配删除。</li>
+                    </ul>
+                  </li>
+                  <li><strong>环境变量过滤与文件工具</strong>：<code>sandboxEnv</code> 在套沙箱启动子进程前按变量名滤掉 <code>KEY|TOKEN|SECRET|PASSW|CREDENTIAL|AUTH|COOKIE|PRIVATE</code>；结构化文件读写则走 <a href="https://github.com/Master-Norna/yan/blob/3414c84e5cc136b2a7b22a83851ed8b3e15ad80d/server/work/paths.js" target="_blank" rel="noopener noreferrer"><code>server/work/paths.js</code></a> 与 <code>screenPath</code>，在严档里锁死工作目录。</li>
+                </ul>
+                <p>项目原本是 Windows-first：<a href="https://github.com/Master-Norna/yan/blob/3414c84e5cc136b2a7b22a83851ed8b3e15ad80d/server/work/shell.js" target="_blank" rel="noopener noreferrer"><code>server/work/shell.js</code></a> 在 <code>win32</code> 上包一层 <code>POWERSHELL_WRAPPER</code> 走 PowerShell，到了 <code>darwin</code> 只用 <code>/bin/sh -c</code>。<code>#16</code> 开工前在 <code>main</code> 上以 <code>platform: "darwin"</code> 实测，<code>launchctl load</code>、<code>defaults write</code>、<code>crontab -r</code>、<code>bash -lc "crontab -r"</code>、<code>chmod -R 777 /Users/a</code>、<code>eval "$(echo ... | base64 -d)"</code> 在严宽两档全部返回 <code>null</code>；反过来，<code>cp -r /Users/a/src ./backup/</code> 因为只读来源正则只认 PowerShell 开关而被严档误拒，<code>echo Set-Alias</code> 因为没认指令位在两档都被误拦。</p>
+                <p>整个 PR #17 的任务，就是在沿用既有执行器与工具路由的前提下，通过 <code>server/sandbox.js</code> 等 7 个文件把这套筛查补齐到 macOS 和跨平台共用路径上。</p>
+              `
+            },
+            {
+              id: "sandbox-sec-2",
+              heading: "2. 命令规则：按“子命令动作”立规矩，以及为什么 sudo 反着来",
+              html: `
+                <p>最直接的一块是往共用 <code>RULES</code> 数组里添 macOS 管理工具。设计原则在 <a href="https://github.com/Master-Norna/yan/issues/16" target="_blank" rel="noopener noreferrer"><code>#16</code></a> 里先对齐好：不按宿主拆成两张黑名单，而是按「站在指令位（<code>CMD</code>）上的修改子命令拒、明确的查询子命令放」写进同一张表：</p>
+                <div class="code-figure">
+                  <div class="code-figure-bar">
+                    <span class="code-lang">JavaScript · server/sandbox.js（RULES 共用规则节选，Line 1572-1625）</span>
+                    <button type="button" class="code-copy-btn">复制代码</button>
+                  </div>
+                  <pre><code>// server/sandbox.js（RULES 共用规则节选，Line 1572-1625）
+const EVERY = "严宽审",
+  WIDE = "宽审";
+
+const RULES = [
+  [
+    cmd(
+      "launchctl",
+      String.raw\`(?:load|unload|bootstrap|bootout|enable|disable|kickstart|\` +
+        String.raw\`submit|remove|start|stop|kill|attach|setenv|unsetenv|config|debug|reboot)\\b\`
+    ),
+    "不动系统服务",
+    EVERY
+  ],
+  [
+    cmd("defaults", String.raw\`(?:(?:-currentHost|-host\\s+\\S+)\\s+)?(?:write|delete|import|rename)\\b\`),
+    "不动系统设置",
+    EVERY
+  ],
+  [
+    cmd(
+      "security",
+      SECURITY_COMMAND +
+        String.raw\`(?:export\\b|dump-keychain\\b[^;|&amp;\\n]*\\s-(?=[a-z]*d)[a-z]+(?=[\\s"']|$)|\` +
+        String.raw\`find-(?:generic|internet)-password\\b[^;|&amp;\\n]*\\s-(?=[a-z]*[wg])[a-z]+(?=[\\s"']|$))\`
+    ),
+    "不直接读取或导出钥匙串密码与密钥",
+    "严"
+  ]
+];</code></pre>
+                </div>
+                <p>按这套规则，<code>launchctl print gui/501</code>、<code>command -v launchctl</code>、<code>echo "launchctl bootout gui/501/com.example.service"</code>、<code>defaults read</code>、<code>crontab -l -u admin</code>（<code>-l</code> 和 <code>-u</code> 参数顺序不限）、<code>diskutil list</code> 都会放行；改服务的 <code>launchctl bootout</code>、改配置的 <code>defaults write</code>、删计划任务的 <code>crontab -r</code> 或无参从管道读入、抹盘和改分区的 <code>diskutil erase*</code> / <code>apfs deleteVolume</code>、改网络配置的 <code>networksetup -set*</code> 则在严宽审三档全拦。</p>
+                <p>两条特例不能套用“只读就放”：</p>
+                <ol>
+                  <li><strong>钥匙串（<code>security</code>）</strong>：修改钥匙串、解锁、<code>authorizationdb write</code>、<code>-i</code> 交互与 <code>-p</code> 提示符在严宽审三档都拦；但 <code>find-generic-password -w</code> / <code>-g</code>（含 <code>-gw</code> 这类合并短选项）、<code>dump-keychain -d</code>（<code>-dg</code>）以及不带 <code>-t</code> 的 <code>security export</code>（默认导出含私钥的 <code>all</code>）虽然名义上是“读”，吐出来的直接是明文密码和私钥，所以专门压进 <code>"严"</code> 档转用户请示。</li>
+                  <li><strong>脚本控制（<code>osascript</code>）</strong>：严档整条拦下转请示；宽档与审档已经放开 <code>node -e</code> 这类任意脚本，单禁普通脚本意义不大，所以只把显式提权（<code>with administrator privileges</code> 与 JXA 的 <code>administratorPrivileges: true</code>）并入 <code>ELEVATION</code> 规则三档同拦。</li>
+                </ol>
+                <p>本以为写好 <code>cmd()</code> 就能把所有命令统一管住，结果 <strong><code>sudo</code> 上演了一场 180 度反转</strong>。</p>
+                <p>起初我把 <code>sudo</code> 也收进 <code>CMD</code> 指令位匹配，打算顺便解决 <code>echo sudo x</code> 误报。第一轮审查（<a href="https://github.com/Master-Norna/yan/pull/17#issuecomment-6651295232" target="_blank" rel="noopener noreferrer"><code>#issuecomment-6651295232</code></a>）维护者直接打了回来：#16 不单独枚举 root 专属高危命令，全靠 <code>sudo</code> 这道关兜底，而 <code>main</code> 原本靠 <code>(^|\\s)sudo\\s</code> 拦得住的 <code>if sudo id; then :; fi</code>、<code>! sudo id</code>、<code>case x in a) sudo id;; esac</code>、<code>find . -exec sudo rm {} ;</code>、<code>echo x | xargs -n 1 sudo rm</code>、<code>FOO="a b" sudo id</code>、<code>env -u X sudo id</code>，全因为新指令位没覆盖包装前缀而漏掉了。</p>
+                <p>我老老实实往前缀表里补了一轮 <code>XARGS_OPTIONS</code>、<code>ENV_OPTS</code>、<code>FIND_ACTION</code>。到下一轮，维护者拿着审查报告（<a href="https://github.com/Master-Norna/yan/pull/17#issuecomment-6661557023" target="_blank" rel="noopener noreferrer"><code>#issuecomment-6661557023</code></a>）又列出一排全线漏判的写法：</p>
+                <div class="code-figure">
+                  <div class="code-figure-bar">
+                    <span class="code-lang">Shell</span>
+                    <button type="button" class="code-copy-btn">复制代码</button>
+                  </div>
+                  <pre><code>command -p sudo id        time -p sudo id         exec -a z sudo id
+nice -n5 sudo id          timeout -k 1 5 sudo id  stdbuf -o0 sudo id
+watch sudo id             wsl sudo id             ssh -t host sudo reboot
+parallel sudo ::: id</code></pre>
+                </div>
+                <p>到这里问题就明朗了：<strong>POSIX 下能把下一段命令当参数拉起来的包装程序根本列不完，给每个工具维护一套带值选项表是一条死胡同。</strong> 维护者拿自己本机约 4,000 条真实历史指令跑了一遍，引号外面出现整词 <code>sudo</code> 的正常命令是 <strong>0 条</strong>，于是主动收回了第一轮“放行 <code>echo sudo x</code>”的要求。</p>
+                <p>于是我把臃肿的 <code>XARGS_OPTIONS</code> 和 <code>FIND_ACTION</code> 带值选项表全删了，让 <code>sudo</code> 单独走一条剥掉引号内容后的整词检查：</p>
+                <div class="code-figure">
+                  <div class="code-figure-bar">
+                    <span class="code-lang">JavaScript · server/sandbox.js（Line 1508 &amp; 1680）</span>
+                    <button type="button" class="code-copy-btn">复制代码</button>
+                  </div>
+                  <pre><code>// server/sandbox.js（Line 1508 &amp; 1680）
+const SUDO_WORD = /(^|[\\s;&amp;|()&lt;&gt;])sudo(?=$|[\\s;&amp;|()&lt;&gt;])/i;
+// forbiddenWhy() 命中判断：
+pattern.test(pattern === SUDO_WORD ? scanned.unquoted : scanned.syntax);</code></pre>
+                </div>
+                <p><code>scanned.unquoted</code> 已经由扫描器线性剥空了单双引号里的普通文本，并把识别到的单层 <code>sh -c "..."</code> 执行串展开在里面。结果是 <code>git commit -m "if sudo fails"</code>、<code>rg 'sudo' src</code>、<code>visudo</code>、<code>sudoers</code> 照常放行；<code>ssh -t host sudo reboot</code>、<code>bash -c "command -p sudo id"</code>、<code>sudo&gt;/tmp/out id</code> 全部在严宽审拦住（不进不可审）；留下的代价是 <code>echo sudo x</code> 和重定向目标恰好叫 <code>sudo</code> 的 <code>echo x&gt;sudo</code> 也会被严宽审拦下。用这条极简的保守误报换回确定性，比堆包装词选项表划算得多。</p>
+              `
+            },
+            {
+              id: "sandbox-sec-3",
+              heading: "3. 路径不是普通字符串：来源豁免、带值选项与冒号陷阱",
+              html: `
+                <p>严档目录检查的逻辑是：一旦整条指令命中 <code>DIRECT_FILE_MUTATION</code>（本 PR 在写动词表里补进了 <code>chmod</code>、<code>chown</code>、<code>chflags</code>、<code>ln</code>、<code>rsync</code>、<code>ditto</code>、<code>sed -i</code> / <code>--in-place</code>），所有绝对路径、家目录和 <code>..</code> 上溯都会受工作目录约束。</p>
+                <p>但真实场景里经常需要把工作目录外的文件拷进来：</p>
+                <div class="code-figure">
+                  <div class="code-figure-bar">
+                    <span class="code-lang">Shell</span>
+                    <button type="button" class="code-copy-btn">复制代码</button>
+                  </div>
+                  <pre><code>cp -r /Users/a/src ./backup/
+rsync -a --exclude node_modules /Users/a/source/ ./backup/
+ditto -V /Users/a/file.zip ./file.zip
+ln -s /opt/homebrew/bin/node ./node</code></pre>
+                </div>
+                <p>把参数一律当写入路径，这些合法操作全死；反过来按字符串全局豁免也不行，同一条命令里写了 <code>Copy-Item C:\\x .; Remove-Item C:\\x</code>，第一个 <code>C:\\x</code> 是只读来源，第二个 <code>C:\\x</code> 却是删除目标。</p>
+                <p>一开始我偷懒用“无值短选项白名单”去跨选项找第一个位置参数当来源，结果两轮真实回放与复核（<a href="https://github.com/Master-Norna/yan/pull/17#issuecomment-6661557023" target="_blank" rel="noopener noreferrer"><code>#issuecomment-6661557023</code></a>、<a href="https://github.com/Master-Norna/yan/pull/17#issuecomment-6704937953" target="_blank" rel="noopener noreferrer"><code>#issuecomment-6704937953</code></a>）打出一整排误伤：</p>
+                <ul>
+                  <li><code>sed -i '' 's/[0-9]/X/g' ./config.ts</code>：替换表达式 <code>s/[0-9]/X/g</code> 和 <code>/TODO/d</code> 里的斜杠被当作 POSIX 绝对路径拦截；</li>
+                  <li><code>rsync -av --exclude .git/ ./ ./backup/</code>：过滤模式里的 <code>.git/</code> 触发了 <code>.git</code> 内部修改保护；</li>
+                  <li><code>ditto -arch arm64 /Users/a/f.zip ./f.zip</code>：<code>replace(/^--/, "")</code> 没处理单横线长选项，<code>-arch</code> 对不上 <code>arch</code>，后面的架构名 <code>arm64</code> 被当成源操作数豁免了，真正的源 <code>/Users/a/f.zip</code> 反而裸露被拦；</li>
+                  <li><code>rsync -ave ssh /Users/a/x ./y</code>：只认独立的 <code>-e</code>，合并短选项里的 <code>e</code> 没识别出来，结果 <code>ssh</code> 被当作来源；</li>
+                  <li><code>rsync --rsync-path=/usr/local/bin/rsync /Users/a/x ./y</code>、<code>rsync -a --exclude-from=/Users/a/ignore /Users/a/x ./y</code>：只跨过参数但没抹掉选项里的只读路径，导致 <code>=</code> 后面的路径被当成目录外写入。</li>
+                </ul>
+                <p>反面约束同样紧：<code>rsync --remove-source-files</code> 会删掉来源，源路径就不能豁免；<code>--log-file</code>、<code>--temp-dir</code>、<code>--backup-dir</code> 是真正在往外面写文件，遍历时必须跨过它们去定位操作数，却绝对不能把它们的值抹白。</p>
+                <p>最后的 <code>stripReadSources</code> 改成按 <code>scanned.quotes</code> 边界切词，<strong>只把当次识别为只读来源或只读选项值的 <code>[start, end)</code> UTF-16 索引区间填成空格</strong>，同时避开一个隐蔽坑——如果命令里混着 <code>rsync</code> / <code>ditto</code> / <code>sed</code>，不要每匹配到一个工具就重新扫一遍整条指令的字符串构建引号表，而是直接复用 <code>shellText</code> 已经算好的 <code>scanned.quotes</code>：</p>
+                <div class="code-figure">
+                  <div class="code-figure-bar">
+                    <span class="code-lang">JavaScript · server/sandbox.js（stripReadSources 节选，Line 1849-1885）</span>
+                    <button type="button" class="code-copy-btn">复制代码</button>
+                  </div>
+                  <pre><code>// server/sandbox.js（stripReadSources 节选，Line 1849-1885）
+if (options &amp;&amp; value.startsWith("-")) {
+  const [name, attached] = value.replace(/^--/, "").split("=", 2);
+  if (tool === "rsync") {
+    const short = /^-[A-Za-z]*?([efBT])(.*)$/.exec(value),
+      takesValue = RSYNC_VALUES.has(name) || !!short,
+      hasAttached = short ? short[2] !== "" : attached !== undefined;
+    ignored = RSYNC_READ_VALUES.has(name) || !!(short &amp;&amp; "ef".includes(short[1]));
+    if (takesValue &amp;&amp; !hasAttached &amp;&amp; tokens[i + 1]) {
+      if (ignored) {
+        const arg = tokens[i + 1];
+        for (let j = arg.start; j &lt; arg.end; j++) chars[j] = " ";
+      }
+      i++;
+    }
+  }
+  // ditto 与 sed 同理：--log-file 等写参数只 i++ 跨过，不写入 chars[j] = " "
+} else if (!operand) {
+  operand = true;
+  ignored = tool === "sed" ? !sedScript : sources &amp;&amp; !removeSource;
+}
+if (ignored) for (let j = token.start; j &lt; token.end; j++) chars[j] = " ";</code></pre>
+                </div>
+                <p>另外两处跨平台细节也全栽在字符归一化上：</p>
+                <ol>
+                  <li><strong><code>withoutDataStream</code> 的冒号条件</strong>：Windows NTFS 允许用 <code>.env::$DATA</code> 或 <code>x:stream</code> 读写同一个文件。旧实现为了防止 <code>.env::$DATA</code> 绕过 <code>SECRET_FILE</code> 校验，会把路径片段里冒号及后面截掉。但在 macOS 上，冒号是合法的普通文件名字符（例如 <code>keys/service:prod.pem</code> 或 <code>/tmp/user:data/.yan</code>）。如果把 Windows 的数据流截断无条件套在 POSIX 上，会把合法文件名截成别的东西。因此 <code>withoutDataStream</code> 必须留着 <code>process.platform === "win32"</code> 这道门禁：</li>
+                </ol>
+                <div class="code-figure">
+                  <div class="code-figure-bar">
+                    <span class="code-lang">JavaScript · server/sandbox.js（Line 1731-1734）</span>
+                    <button type="button" class="code-copy-btn">复制代码</button>
+                  </div>
+                  <pre><code>// server/sandbox.js（Line 1731-1734）
+function withoutDataStream(value) {
+  const text = String(value || "");
+  return process.platform === "win32"
+    ? text.replace(/(^|[\\\\/])([^\\\\/]*?)(?&lt;!^[A-Za-z]):(?![\\\\/])[^\\\\/]*/g, "$1$2")
+    : text;
+}</code></pre>
+                </div>
+                <ol>
+                  <li><strong><code>screenStoreCommand</code> 的斜杠拆分</strong>：存储根保护里会把命令文本的 <code>/</code> 统一替换成 <code>\\</code> 去匹配 <code>\\.yan\\*</code>，但判断 <code>workdir</code> 是否落在存储根之内时，<code>pathIsInside(rootPath, ...)</code> 必须使用原生分隔符的 <code>rootPath</code>；两份混成同一套斜杠，在 macOS 存储根里跑命令就会直接失配。</li>
+                </ol>
+              `
+            },
+            {
+              id: "sandbox-sec-4",
+              heading: "4. 从正则到三视图线性扫描器：落单撇号与三次同步卡死",
+              html: `
+                <p>如果只写上面那张规则表和几个参数处理，PR 到这里就可以收工了。真正把难度拉高十倍的，是把 <code>sh -c</code>、<code>bash -lc</code>、环境变量前缀和管道喂 Shell 接进共用规则之后，纯正则开始在真实语料上成片出错。</p>
+                <p>整个扫描器 <code>shellText</code> 最终是被两类问题逼出来的：<strong>上下文错位</strong>与<strong>同步热路径上的复杂度退化</strong>。</p>
+                <h3 id="sandbox-h3-1">第一类：上下文错位（引号、<code>2&gt;&amp;1</code> 与落单撇号）</h3>
+                <p>在 4,000 到 13,000 条真实历史记录回放和审查中，先后暴露出四组典型问题：</p>
+                <ol>
+                  <li><strong>引号内的 <code>(</code> 误制造指令位</strong>：真实语料里的一条常规 Python 命令 <code>python -c "print(d.get('eval'))"</code> 和一条 grep 搜索 <code>grep -n "foo('eval')" src/a.js</code>，在早期版本里从四档放行直接变成<strong>四档全拦</strong>（包括「不可审」）。原因只是引号里的 <code>(</code> 触发了指令位匹配，让字符串里的 <code>'eval'</code> 撞上了 <code>HIDDEN_COMMAND</code>。<code>node -e "console.log(require('eval'))"</code>、<code>echo "(eval x)"</code> 也全都躺枪。</li>
+                  <li><strong>管道检测的引号转义不一致</strong>：<code>pipesToShell</code> 早期另起炉灶判断引号，只跳过反引号而没跳过 POSIX 的 <code>\\"</code>，导致 <code>rg "a\\"|sh" src</code> 和真实语料里的一条 <code>grep -E "a\\"b|c" x; grep -E "powershell|pwsh" y</code> 在 <code>\\"</code> 处提前闭合引号，把后面的 <code>|sh</code> 和 <code>|pwsh</code> 判成了不可审的管道喂 Shell。统一成按执行 Shell 切分转义后（POSIX 双引号认 <code>\\</code>，PowerShell 认 <code>\`</code>），这两条在 <code>darwin</code> 回到放行；有意思的是它们在 <code>win32</code> 下依然返回四档拦截——维护者在 PowerShell 5.1 和 7 解析器里核对过，PowerShell 双引号不认 <code>\\"</code>，这两条在 PowerShell 里本身就报 <code>TerminatorExpectedAtEndOfString</code> 跑不起来，于是主动撤回了“让 <code>win32</code> 也恢复放行”的要求。</li>
+                  <li><strong>引号内 <code>2&gt;&amp;1</code> 误中重定向写判断</strong>：为了在 <code>syntax</code> 视图里把引号内部的命令分隔符藏起来，扫描器把引号里的 <code>;&amp;|(){}\\r\\n</code> 替换成 <code>\\x01</code>。结果 <code>wsl -e bash -lc '~/lab/run.sh 2&gt;&amp;1 | tail -40'</code> 里的 <code>&amp;</code> 变成了 <code>\\x01</code>，<code>DIRECT_FILE_MUTATION</code> 里的 <code>&gt;{1,2}\\s*[^&amp;]</code> 排除不掉 <code>\\x01</code>，整条查看日志命令在严档被当成写文件拦了下来。把否定字符集补成 <code>[^&amp;\\x01]</code> 才解决。</li>
+                  <li><strong>落单撇号吞掉后续一整段代码</strong>（<a href="https://github.com/Master-Norna/yan/pull/17#issuecomment-6685041139" target="_blank" rel="noopener noreferrer"><code>#issuecomment-6685041139</code></a>、<a href="https://github.com/Master-Norna/yan/pull/17#issuecomment-6704937953" target="_blank" rel="noopener noreferrer"><code>#issuecomment-6704937953</code></a>）：这是最险的一类安全回归。看看这两组由机制探针构造出的真实形状：</li>
+                </ol>
+                <div class="code-figure">
+                  <div class="code-figure-bar">
+                    <span class="code-lang">Shell</span>
+                    <button type="button" class="code-copy-btn">复制代码</button>
+                  </div>
+                  <pre><code># don't do this
+sudo rm -rf /x
+
+cat &gt; a.md &lt;&lt;'EOF'
+it's fine
+EOF
+sudo id
+echo 'done'</code></pre>
+                </div>
+                <p>模型在多行命令里写一句 <code># don't do this</code> 注释，或者用 heredoc / PowerShell <code>@'...'@</code> 写一段带英文撇号 <code>it's fine</code> 的 Markdown，在真实记录里极常见（语料里就有约 80 条带落单引号的指令）。旧 <code>quotedEnd</code> 碰到 <code># don't</code> 里没收尾的 <code>'</code> 就一路算到末尾，或者让 heredoc 正文里的 <code>it's</code> 跨越 <code>EOF</code> 跟后面 <code>echo 'done'</code> 的 <code>'done'</code> 配成一对，中间的 <code>sudo rm -rf /x</code> 和 <code>sudo id</code> 在 <code>syntax</code> 与 <code>unquoted</code> 视图里瞬间消失，所有规则全盲。更隐蔽的还有 <code>case x in</code>、<code>$(echo \${x:-)})</code> 和未加引号 heredoc 里的 <code>)</code>，会让早期的括号计数误以为外层 <code>$()</code> 已经结束，把后面的 <code>; sudo id</code> 留在引号视图里漏掉。</p>
+                <p>解法必须把整套扫描上下文立起来：</p>
+                <ul>
+                  <li>引号外、以 <code>#</code> 开头的行注释先从视图里抹成空格（维持字符索引不变），未找到收尾引号的下标直接记 <code>-1</code> 并当成普通字符前进；</li>
+                  <li>扫描器显式消费 PowerShell here-string（<code>@'...'@</code> 全字面量、<code>@"..."@</code> 仅展开 <code>$()</code>）与 POSIX heredoc（<code>&lt;&lt;'EOF'</code> 全字面量、<code>&lt;&lt;EOF</code> 仅扫 <code>$()</code> 和反引号替换，但 <code>sh &lt;&lt;EOF</code> 这类把正文喂给 Shell 执行的仍压栈按指令扫描）。</li>
+                </ul>
+                <h3 id="sandbox-h3-2">第二类：同步热路径上的三次复杂度退化</h3>
+                <p><code>server/sandbox.js</code> 是在桥接处理 HTTP 请求时<strong>同步执行</strong>的。只要某个长输入出现平方甚至指数级回溯，整个 Node 桥接进程就会被卡死。整个 PR 期间先后撞出并打掉三次退化：</p>
+                <ol>
+                  <li><strong>管道后缀重扫（<code>b91ed48</code> 修复）</strong>：早期正则里每个 <code>\${CMD}</code> 命中后都会向后扫到尾，<code>':;'.repeat(5000)</code>（10 KB）耗时 <strong>2.7 秒</strong>，40 KB 直接跑不完。改为写一段引号外逐段扫描的 <code>pipesToShell</code>（配合手写 <code>skipPipeRedir</code> 跳过 <code>2&gt;/dev/null</code> 等前导重定向），<code>':;'.repeat(5000)</code> 降到 <strong>3.7 ms</strong>，<code>':;'.repeat(20000)</code>（40 KB）只要 <strong>15.8 ms</strong>。</li>
+                  <li><strong>未闭合 <code>"$(</code> 互递归指数爆炸（<code>e1af9ed</code> 修复）</strong>：<code>3447d03</code> 里的 <code>quotedEnd</code> 与 <code>substitutionEnd</code> 在找不到右括号/右引号时互相重扫同一截后缀，外层循环又从下一个字符重头再来——仅输入 <code>'"$('.repeat(20 / 25 / 30)</code>（区区 <strong>60 / 75 / 90 个字符</strong>），darwin 严档耗时就飙到 <strong>0.6 / 6.5 / 71.4 ms</strong>。</li>
+                  <li><strong>长注释抹白后的跨行回溯（<a href="https://github.com/Master-Norna/yan/pull/17#issuecomment-6704937953" target="_blank" rel="noopener noreferrer"><code>#issuecomment-6704937953</code></a> 修复）</strong>：把 <code>#</code> 注释抹成空格后，<code>CMD</code> 锚点后面的 <code>\\s*</code> 会跨过换行吃掉整片空白，从每一行行首重头尝试。独立复核测出 <code>"# c\\n".repeat(4000)</code>（16 KB）在 <code>main</code> 上只需 <strong>2 ms</strong>，在 <code>e1af9ed</code> 上跑出了 <strong>16.4 秒</strong>。把 <code>CMD</code> 与 <code>PREFIX</code> 里的空白全部收窄为行内空白 <code>INLINE_SPACE = String.raw\`[^\\S\\r\\n]\`</code>（同时约束第二段 <code>PREFIX</code> 必须跟在 <code>SHELL</code> 后避免双前缀切分回溯）才彻底压回毫秒级。</li>
+                </ol>
+                <p>最终成型的 <code>quoteContext</code> + <code>substEnds</code> + <code>shellText</code> 采用「<strong>倒序预填表 + 显式栈单趟生成三份等长视图</strong>」：</p>
+                <div class="code-figure">
+                  <div class="code-figure-bar">
+                    <span class="code-lang">JavaScript · server/sandbox.js（quoteContext 倒序填表，Line 147-162）</span>
+                    <button type="button" class="code-copy-btn">复制代码</button>
+                  </div>
+                  <pre><code>// server/sandbox.js（quoteContext 倒序填表，Line 147-162）
+function quoteContext(text, shell, offset = 0, dotComments = false) {
+  const single = new Int32Array(text.length + 2).fill(-1),
+    double = new Int32Array(text.length + 2).fill(-1),
+    substitution = new Int32Array(text.length + 2).fill(-1);
+  let newline = text.length,
+    blockEnd = -1;
+  for (let i = text.length - 1; i &gt;= 0; i--) {
+    const ch = text[i];
+    if (dotComments &amp;&amp; ch === "#" &amp;&amp; text[i + 1] === "&gt;") blockEnd = i + 2;
+    if (ch === "\\n" || ch === "\\r") newline = i;
+    single[i] = ch === "'" ? i : single[i + 1];
+    if (escapes(text, i, shell, '"')) double[i] = double[i + 2];
+    else if (ch === '"') double[i] = i;
+    else if (shell !== "cmd" &amp;&amp; ch === "$" &amp;&amp; text[i + 1] === "(" &amp;&amp; substitution[i + 2] &gt;= 0)
+      double[i] = double[substitution[i + 2] + 1];
+    else double[i] = double[i + 1];
+    // 同步倒序计算 substitution[i]，未闭合均缓存 -1
+  }
+  return { text, shell, offset, single, double, substitution };
+}</code></pre>
+                </div>
+                <p>拿到单双引号和 <code>substEnds</code>（<code>Int32Array</code>，专门处理含 <code>case</code>、<code>\${}</code>、heredoc 与 <code>$(())</code> 的真 <code>$()</code> 配对）后，<code>shellText</code> 用显式 <code>frames</code> 栈一次输出三份长度完全相同的字符串：</p>
+                <ul>
+                  <li><code>text</code>：行注释已抹成空格，保留原始下标，供长度与间隔核对；</li>
+                  <li><code>syntax</code>：普通引号内的 <code>;&amp;|(){}\\r\\n</code> 置为 <code>\\x01</code>、转义后字符置为 <code>\\x01</code>，而 <code>$()</code> 与单层执行串内部按真实语法保留；</li>
+                  <li><code>unquoted</code>：普通单双引号整段抹为空格，同时展开 <code>$()</code> 与单层执行串，专供 <code>SUDO_WORD</code> 使用。</li>
+                </ul>
+                <p>三份视图和原始输入的每一个字符索引严丝合缝，深层 <code>$()</code> 嵌套不再递归复制整段正文，所有的 <code>-1</code> 失败结果都只算一次。<code>test/unit/sandbox.test.mjs</code> 里把 24 条 4 KB–40 KB 的长注释、空行、heredoc、未闭合 <code>"$(</code> 和 <code>rsync</code> 长串全部锁进双平台四档 <code>&lt; 200ms</code> 断言，彻底堵死了回溯复发。</p>
+              `
+            },
+            {
+              id: "sandbox-sec-5",
+              heading: "5. 跨 Shell 求值顺序：外层 PowerShell 双引号先于内层 bash -c",
+              html: `
+                <p>扫描器能区分平台、展开单层 <code>bash -c "..."</code> 执行串之后，独立复核与维护者（<a href="https://github.com/Master-Norna/yan/pull/17#issuecomment-6847054931" target="_blank" rel="noopener noreferrer"><code>#issuecomment-6847054931</code></a>）又抓出一个极漂亮的 P1 跨 Shell 回归：</p>
+                <div class="code-figure">
+                  <div class="code-figure-bar">
+                    <span class="code-lang">PowerShell</span>
+                    <button type="button" class="code-copy-btn">复制代码</button>
+                  </div>
+                  <pre><code>bash -c "echo '$(Stop-Computer)'"
+bash -c "echo foo # $(Stop-Computer)"</code></pre>
+                </div>
+                <p>这两条指令在 <code>main</code> 上严/宽/审三档全部拦截，而在当时的 <code>f409c65</code> 上三档全放。</p>
+                <p>错在哪？当时扫描器识别到 <code>bash -c "..."</code> 后，直接把引号里的内容丢给了 <code>bodyShell = "posix"</code> 栈帧去扫。在 POSIX 眼里，第一条的 <code>$(Stop-Computer)</code> 裹在单引号 <code>'...'</code> 里，第二条跟在 <code>#</code> 注释后面——两边都不会执行，于是扫描器乖乖把它们当字面量遮掉了。</p>
+                <p>但回到真实运行顺序上，<strong>外层壳是 PowerShell</strong>。在 PowerShell 解析命令行参数时，双引号字符串会先做一次表达式展开，再把求值完的结果作为参数交给 <code>bash</code>（参见 <a href="https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_quoting_rules?view=powershell-7.5" target="_blank" rel="noopener noreferrer">Microsoft Learn PowerShell 引号规则</a>）。维护者在 Windows PowerShell 5.1 和 PowerShell 7 上用无害替身函数实测：外层替换里的命令确实会先执行一次，传进替身 <code>bash</code> 时收到的已经是 <code>echo 'SAFE_STUB_RESULT'</code>。只有像 <code>bash -c "echo '\`$(Stop-Computer)'"</code> 这样在外层双引号里先用反引号转义了 <code>$</code>，它才真的会逃过外层求值、原封不动落进 POSIX 单引号。</p>
+                <p>修法没有堆砌特例规则，只是在 <code>841e996</code> 给 <code>shellText</code> 的双引号执行串多压一帧按外层 <code>shell</code> 解析的扫描任务（<code>outerQuote = true</code>）：</p>
+                <div class="code-figure">
+                  <div class="code-figure-bar">
+                    <span class="code-lang">JavaScript · server/sandbox.js（Line 1304-1314）</span>
+                    <button type="button" class="code-copy-btn">复制代码</button>
+                  </div>
+                  <pre><code>// server/sandbox.js（Line 1304-1314）
+if (i === frame.scriptAt) {
+  const command = text.slice(frame.start, i),
+    body = text.slice(i + 1, end),
+    bodyShell = CMD_SCRIPT.test(command) ? "cmd" : POSIX_SCRIPT.test(command) ? "posix" : "powershell";
+  if (text[i] === '"') {
+    const outer = quoteContext(body, shell, at + 1, dotComments);
+    outer.ends = substEnds(body, shell, true, dotComments);
+    push(outer, 0, body.length, true, '"', true);
+  }
+  push(quoteContext(body, bodyShell, at + 1, dotComments), 0, body.length, true);
+}</code></pre>
+                </div>
+                <p>外层栈帧遇到 <code>$()</code> 时把整段原样露给三份视图（普通参数文本保持不变，不误放内层字面量），内层栈帧再照 POSIX 规则继续筛余下的脚本；顺序一摆正，上面的正反例全对上了。</p>
+              `
+            },
+            {
+              id: "sandbox-sec-6",
+              heading: "6. 收官战：Invoke-Expression 的错误类比，与块注释遮蔽 $() 配对",
+              html: `
+                <p>合并前的最后三轮迭代（<code>f409c65 → ef3d1b5 → fe78d08 → 4e44763</code>），全围着 <code>Invoke-Expression</code> 一条规则打转，却把整篇排查里最容易犯的归因错误和管线遮蔽问题照得一清二楚。</p>
+                <h3 id="sandbox-h3-3">第一步：修好删字 bug，顺带揭出旧词匹配的误伤</h3>
+                <p>早先 <code>withoutExeDir</code> 为了剥掉命令行上的程序路径，把正则里的路径前缀匹配得太宽，误把文本里的 <code>Invoke-Expression</code> 也当目录截掉了一块。修完这个错误后，真实历史语料里立刻跳出一条常规搜索误伤：</p>
+                <div class="code-figure">
+                  <div class="code-figure-bar">
+                    <span class="code-lang">Shell</span>
+                    <button type="button" class="code-copy-btn">复制代码</button>
+                  </div>
+                  <pre><code>grep -rn -i "iex\\|Invoke-Expression\\|HIDDEN" src docs/a.md</code></pre>
+                </div>
+                <p><code>main</code> 对这条四档全放，PR 里因为 <code>HIDDEN_COMMAND</code> 挂着无条件的 <code>\\bInvoke-Expression\\b</code>，直接把一句 <code>grep</code> 打成了<strong>不可审</strong>（连审查批准都没法跑）。</p>
+                <h3 id="sandbox-h3-4">第二步：收紧执行位后的回归，与 <code>. iex</code> 的错误归类</h3>
+                <p>把 <code>Invoke-Expression</code> 和 <code>iex</code> 并入同一条 <code>(?:\${CMD}|=\\s*)</code> 指令位规则后（中间独立复核先挡下一版漏掉 <code>Invoke-Expression($s)</code> 括号写法的候选），<code>grep</code>、<code>rg Invoke-Expression src</code>、<code>git log -S Invoke-Expression</code> 顺利放行。但随后维护者在 <a href="https://github.com/Master-Norna/yan/pull/17#issuecomment-6860117259" target="_blank" rel="noopener noreferrer"><code>#issuecomment-6860117259</code></a> 抓出了点调用回归。</p>
+                <p>我当时在回复里顺手辩解了一句：“<code>main</code> 也放行 <code>. iex $s</code>，点调用算既有缺口。”维护者直接拍回一张四行对照表（严/宽/审/不可审，<code>x</code> 拦 <code>o</code> 放）：</p>
+                <div class="table-scroll">
+                  <table>
+                    <thead><tr><th>指令</th><th><code>main</code> (<code>4fd70a1</code>)</th><th>当时 <code>ef3d1b5</code></th></tr></thead>
+                    <tbody>
+                      <tr><td><code>. Invoke-Expression $s</code></td><td><code>xxxx</code></td><td><code>oooo</code></td></tr>
+                      <tr><td><code>. 'Invoke-Expression' $s</code></td><td><code>xxxx</code></td><td><code>oooo</code></td></tr>
+                      <tr><td><code>. "Invoke-Expression" $s</code></td><td><code>xxxx</code></td><td><code>oooo</code></td></tr>
+                      <tr><td><code>. iex $s</code>（对照）</td><td><code>oooo</code></td><td><code>oooo</code></td></tr>
+                    </tbody>
+                  </table>
+                </div>
+                <p>并附了 PowerShell 5.1 / 7 实测：<code>$payload = "'SAFE_EVAL_RESULT'"; . Invoke-Expression $payload</code> 会真打印 <code>SAFE_EVAL_RESULT</code>。这记纠偏很清醒：<strong><code>main</code> 以前碰巧靠粗糙的全词匹配拦下了 <code>. Invoke-Expression $s</code>，机制再粗糙，只要同一条完整输入在 <code>main</code> 拦而新分支放，它就是本 PR 引入的回归；拿同义别名 <code>. iex</code> 的旧缺口来开脱，属于把两件不相等的东西混为一谈。</strong></p>
+                <h3 id="sandbox-h3-5">第三步：块注释与双引号 <code>$()</code> 里的前序遮蔽</h3>
+                <p>我在 <code>fe78d08</code> 给点调用补上了空格和真实 PowerShell 反引号续行（通过核对 <code>scanned.text</code> 排除 <code>\`n</code> 等普通转义，只认 <code>\`</code> + LF/CRLF）。维护者复核全过，紧接着又顺着 PowerShell 语法摸出一条变体（<a href="https://github.com/Master-Norna/yan/pull/17#issuecomment-6870364900" target="_blank" rel="noopener noreferrer"><code>#issuecomment-6870364900</code></a>）：</p>
+                <div class="code-figure">
+                  <div class="code-figure-bar">
+                    <span class="code-lang">PowerShell</span>
+                    <button type="button" class="code-copy-btn">复制代码</button>
+                  </div>
+                  <pre><code>. &lt;# ordinary comment #&gt; Invoke-Expression $s
+. &lt;# ordinary comment #&gt; 'Invoke-Expression' $s
+$r = . &lt;# ordinary comment #&gt; Invoke-Expression $s</code></pre>
+                </div>
+                <p>PowerShell 允许在代码中间插 <code>&lt;# ... #&gt;</code> 块注释，点调用照常执行；而 <code>fe78d08</code> 只跳过空白和反引号续行，遇到 <code>&lt;#</code> 就断了。</p>
+                <p>写第一版块注释补丁时，直接调用很快修通了，但交付前的<strong>独立会话复核</strong>一针见血地拦下了一句包装写法：</p>
+                <div class="code-figure">
+                  <div class="code-figure-bar">
+                    <span class="code-lang">PowerShell</span>
+                    <button type="button" class="code-copy-btn">复制代码</button>
+                  </div>
+                  <pre><code>echo "$(. &lt;# ordinary comment #&gt; Invoke-Expression $s)"</code></pre>
+                </div>
+                <p>起初以为只是正则没匹配到，追进去才发现根因根本不在 <code>HIDDEN_COMMAND</code>：<strong>块注释结尾 <code>comment #&gt;</code> 里的 <code>#</code> 前面刚好是个空格，<code>commentAt</code> 把这个 <code>#&gt;</code> 当成了普通行注释起点！</strong> 这一吞不要紧，紧跟在 <code>#&gt;</code> 后面的右括号 <code>)</code> 一起被行注释抹进了行尾；外层双引号里的 <code>$(</code> 找不到配对的 <code>)</code>，整段 <code>$()</code> 被当作没闭合的普通双引号内容遮成了 <code>\\x01</code>。候选位置在前一阶段已经没了，后面的命令正则再怎么改都看不见它。</p>
+                <h3 id="sandbox-h3-6">最终解：<code>4e44763</code> 的两层受限补查</h3>
+                <p>为了不让一条块注释小规则动摇已经对过 13,000 多条记录的默认扫描语义，最终在 <a href="https://github.com/CaramelizedCUDA/yan-local-chat/commit/4e447634d931fdf17bb340bf3be1a78710804b44" target="_blank" rel="noopener noreferrer"><code>4e44763</code></a> 选了一个把影响圈死在局部的方案（相对 <code>fe78d08</code> 只改 <code>server/sandbox.js</code> 和 <code>test/unit/sandbox.test.mjs</code>，合计 <strong>+74/-18</strong>）：</p>
+                <div class="code-figure">
+                  <div class="code-figure-bar">
+                    <span class="code-lang">JavaScript · server/sandbox.js（Line 1510-1540）</span>
+                    <button type="button" class="code-copy-btn">复制代码</button>
+                  </div>
+                  <pre><code>// server/sandbox.js（Line 1510-1540）
+function hasHiddenCommand(scanned, dotComments = false) {
+  const spacing = /&lt;#[\\s\\S]*?#&gt;|(?:[^\\S\\r\\n]|\\x60\\r?\\n)+/y,
+    name = /(?:Invoke-Expression|"Invoke-Expression"|'Invoke-Expression')(?![\\w.-])/iy;
+  let commentEnd = 0;
+  for (const match of scanned.syntax.matchAll(HIDDEN)) {
+    const gap = match.indices.groups.dotSpace;
+    // syntax 把所有转义的下一字符都换成 \\x01；点调用只把真实的反引号换行当空白。
+    if (!gap) {
+      if (!dotComments) return true;
+      continue;
+    }
+    if (!/^(?:[^\\S\\r\\n]|\\x60\\r?\\n)+$/.test(scanned.text.slice(gap[0], gap[1]))) continue;
+    if (!scanned.syntax.startsWith("&lt;#", gap[1])) {
+      if (!dotComments) return true;
+      continue;
+    }
+    if (gap[1] &lt; commentEnd) continue;
+    // 块注释的 #&gt; 可能已被行注释视图抹掉；只从已确认的点调用位置读原文，不改共用视图。
+    let at = gap[1];
+    while (true) {
+      spacing.lastIndex = at;
+      if (!spacing.test(scanned.source)) break;
+      at = spacing.lastIndex;
+    }
+    commentEnd = scanned.source.startsWith("&lt;#", at) ? scanned.source.length : at;
+    name.lastIndex = at;
+    if (name.test(scanned.source)) return true;
+  }
+  // 只补查块注释点调用的 $() 配对；原扫描及其它规则的命中不变。
+  return !dotComments &amp;&amp; scanned.source.includes("&lt;#") &amp;&amp; hasHiddenCommand(shellText(scanned.source, scanned.shell, true), true);
+}</code></pre>
+                </div>
+                <p>这段逻辑把四条保护钉死在代码里：</p>
+                <ol>
+                  <li><strong>默认视图零改动</strong>：<code>dotComments</code> 默认 <code>false</code>，<code>shellText</code> 产出的 1,398 行默认视图对照与 <code>fe78d08</code> 逐行一致，不影响任何其他规则。</li>
+                  <li><strong>原地粘性推进（sticky <code>/y</code>）与未闭合短路</strong>：直接调用点号后出现 <code>&lt;#</code> 时，用 sticky 正则固定 <code>lastIndex</code> 从 <code>gap[1]</code> 原地跳过 <code>&lt;#...#&gt;</code>、行内空白和反引号续行核对完整命令名，并在遇到未闭合 <code>&lt;#</code> 时把 <code>commentEnd</code> 置为末尾，避免同一长后缀被反复扫描。</li>
+                  <li><strong>按需单次补查</strong>：只有第一遍普通路径没命中、且原文含 <code>&lt;#</code> 时，才传 <code>dotComments = true</code> 再扫一次 <code>shellText</code>（在 <code>quoteContext</code> 与 <code>scanSubst</code> 里跳过 <code>&lt;#...#&gt;</code> 配对出正确的 <code>$()</code> 右括号）。</li>
+                  <li><strong>只收特定目标、不递归</strong>：补查路径上 <code>if (!dotComments)</code> 屏蔽了普通分支，只放行「点调用 + <code>&lt;#</code> 块注释 + 完整 <code>Invoke-Expression</code> 名字」一类命中，也不会触发第三次扫描。</li>
+                </ol>
+              `
+            },
+            {
+              id: "sandbox-sec-7",
+              heading: "7. 验证：红绿矩阵、本机与 CI 分层，以及 13,561 条真实指令回放",
+              html: `
+                <p>维护者在 <a href="https://github.com/Master-Norna/yan/pull/17#issuecomment-6870364900" target="_blank" rel="noopener noreferrer"><code>#issuecomment-6870364900</code></a> 提了一条很实的要求：前面验证点调用和块注释用的仓库外探针不能只在评论里汇报，必须写进 <code>test/unit/sandbox.test.mjs</code>，否则后续 CI 守不住。</p>
+                <p>我在 <a href="https://github.com/CaramelizedCUDA/yan-local-chat/blob/4e447634d931fdf17bb340bf3be1a78710804b44/test/unit/sandbox.test.mjs#L713-L757" target="_blank" rel="noopener noreferrer"><code>test/unit/sandbox.test.mjs#L713-L757</code></a> 原有的第 32 个顶层测试项内补齐了生成矩阵（9 种间隔 × 3 种命令名 × 直接调用 / 赋值 RHS / <code>$()</code> / 双引号 <code>$()</code> 包装，以及对应的 <code>rg</code> / <code>echo</code> 搜索负例）：</p>
+                <div class="code-figure">
+                  <div class="code-figure-bar">
+                    <span class="code-lang">JavaScript · test/unit/sandbox.test.mjs（Line 729-747）</span>
+                    <button type="button" class="code-copy-btn">复制代码</button>
+                  </div>
+                  <pre><code>// test/unit/sandbox.test.mjs（Line 729-747）
+const tick = "\`";
+for (const gap of [
+  " ",
+  \` \${tick}\\n\`,
+  \` \${tick}\\r\\n\`,
+  \` \${tick}\\n\${tick}\\n\`,
+  \` \${tick}\\r\\n\${tick}\\r\\n\`,
+  \` \${tick}\\n \\t\${tick}\\r\\n\`,
+  " &lt;# ordinary comment #&gt; ",
+  \` &lt;# ordinary comment #&gt; \${tick}\\n\`,
+  \` \${tick}\\r\\n&lt;# ordinary comment #&gt; \${tick}\\n\`
+]) {
+  for (const name of ["Invoke-Expression", "'Invoke-Expression'", '"Invoke-Expression"']) {
+    const call = \`.\${gap}\${name} $s\`;
+    hidden.push(call, \`$r = \${call}\`, \`$(\${call})\`);
+    if (gap.includes("&lt;#") &amp;&amp; !gap.includes(tick)) hidden.push(\`echo "$(\${call})"\`);
+  }
+  searches.push(\`rg '.\${gap}Invoke-Expression' src\`, \`echo ".\${gap}Invoke-Expression"\`);
+}</code></pre>
+                </div>
+                <p>顶层 <code>test()</code> 数量依然是 32，但内部断言把三版源码切得一清二楚（由独立复核与维护者交叉跑出）：</p>
+                <div class="table-scroll">
+                  <table>
+                    <thead><tr><th>被测源码</th><th>沙箱单测结果</th><th>卡在哪一条</th></tr></thead>
+                    <tbody>
+                      <tr><td><code>fe78d08</code></td><td>31 通过 / 1 失败</td><td><code>. &lt;# ordinary comment #&gt; Invoke-Expression $s</code></td></tr>
+                      <tr><td>首版块注释候选</td><td>31 通过 / 1 失败</td><td><code>echo "$(. &lt;# ordinary comment #&gt; Invoke-Expression $s)"</code></td></tr>
+                      <tr><td>最终补丁 <code>4e44763</code></td><td>32 通过 / 0 失败</td><td>全部断言通过</td></tr>
+                    </tbody>
+                  </table>
+                </div>
+                <p>除了这套先红后绿的矩阵，最终交付证据按四层拆开记录，各管各的一块：</p>
+                <div class="table-scroll">
+                  <table>
+                    <thead><tr><th>证据层</th><th>实测内容与结果</th><th>这层能证明什么</th></tr></thead>
+                    <tbody>
+                      <tr><td><strong>本机参考验证</strong>（macOS 26.6.2 arm64 / Node 24.21.0）</td><td>沙箱单测 32/0、<code>npm run check</code> 与全仓 <code>prettier@3.3.3</code> 通过；<code>npm test</code> 单元 448 过 / 0 败 / 3 跳过，E2E 1204 过 / 1 败（<code>exit 1</code>）</td><td>唯一 E2E 失败是 <code>about-first-run.mjs</code> 的悬停 CSS 断言，同 <code>fe78d08</code> 原基线已复现过 <code>14/1</code>，两边单跑该文件均为 <code>15/0</code>；照实报 <code>exit 1</code>，不拿早期提交全绿记录顶替。另在含 <code>&lt;#</code> 且未命中的长串样本测得约 <code>1.3–2×</code> 常数补查开销，至 80,000 字符未见非线性退化</td></tr>
+                      <tr><td><strong>最终 head CI</strong>（<a href="https://github.com/Master-Norna/yan/actions/runs/43563903000" target="_blank" rel="noopener noreferrer"><code>run 43563903000</code></a>）</td><td>Windows 单元·类型·格式、Windows 全量 E2E、Node 22 单元、macOS 参考任务四项全绿</td><td>补齐本机在 macOS Node 里传 <code>{ platform: "win32" }</code> 所不能替代的真 Windows 门禁</td></tr>
+                      <tr><td><strong>独立会话复核</strong></td><td>实现会话外另开会话复核，运行 389 组（3,112 次调用）构造探针、旧 133 场景与 1,398 行默认视图对照</td><td>确认默认视图零回退，并在推送前抓出首版候选的 <code>echo "$(. &lt;# ... #&gt; Invoke-Expression $s)"</code> 漏判</td></tr>
+                      <tr><td><strong>维护者真实语料回放</strong>（<a href="https://github.com/Master-Norna/yan/pull/17#issuecomment-6872924458" target="_blank" rel="noopener noreferrer"><code>#issuecomment-6872924458</code></a>）</td><td>上游拿本机去重后的 <strong>13,561 条真实记录</strong>（言 4,350、Claude Bash 9,211）只读跑四档接口，对照 <code>fe78d08</code> 与 <code>4e44763</code></td><td>两个版本在 <code>win32</code>/<code>darwin</code> 四档判定零变化，确认最后这轮修复没有误伤日常真实命令</td></tr>
+                    </tbody>
+                  </table>
+                </div>
+                <p>跑完这一整圈，体会很深：<strong>真实历史回放与机制构造探针，各自回答完全不同的问题。</strong> 语料回放最擅长揪出平时想不到的日常误伤——<code>d.get('eval')</code>、<code>2&gt;&amp;1</code>、<code>cat &lt;&lt;'EOF'</code> 里写一段 JS <code>eval(code)</code>、<code>grep</code> 搜词，全靠它拦在合入前；而机制探针专抓语料里还没撞上的语法盲区——<code># don't</code>、<code>'"$(</code> 退化、外层双引号 <code>$()</code>、<code>&lt;#...#&gt;</code> 遮蔽右括号，全靠构造出来才能提前看见。缺哪条腿都会跛。</p>
+              `
+            },
+            {
+              id: "sandbox-sec-8",
+              heading: "8. 复盘：四次绕路与上游协作备忘",
+              html: `
+                <p>代码最后虽以 <a href="https://github.com/Master-Norna/yan/commit/3414c84e5cc136b2a7b22a83851ed8b3e15ad80d" target="_blank" rel="noopener noreferrer"><code>3414c84</code></a> 顺利合并，过程中有四次绕路值得写下来留作参照：</p>
+                <ol>
+                  <li><strong>判回归只认“同输入、同入口、同平台参数”的对照</strong>。拿 <code>. iex $s</code> 的旧漏判去给 <code>. Invoke-Expression $s</code> 的回归定性，就是用“相似样例”替“同一条输入”辩解。哪怕旧代码赢在误打误撞，只要同一输入从拦退成放，就先按回归查。</li>
+                  <li><strong>同步链路上的规则扩展，第一天就要把失败缓存与行内空白写死</strong>。<code>2.7s</code>、<code>16.4s</code> 和 90 字符 <code>71.4ms</code> 三次退化根源一样：未闭合的 <code>-1</code> 没进表、未闭合 <code>&lt;#</code> 没记 <code>commentEnd</code>，或者让 <code>\\s*</code> 顺手跨过了换行符。</li>
+                  <li><strong>外部探针探索完必须及时进单测</strong>。仓库外跑过几百组探针只能算调试笔记，没进 <code>test/unit/sandbox.test.mjs</code>，后面的重构随时可能把刚修好的边界一脚踩回原地。</li>
+                  <li><strong>代码推送不等于交付结束，PR 正文与评审对话必须对到最终 SHA</strong>。<code>4e44763</code> 推送时，PR 顶部正文还写着旧提交 <code>fe78d08</code> 和“本轮未新增或修改测试”，直到维护者发合并验收回复才专门点出来；最后在合并后补改 PR 正文，并用 <a href="https://github.com/Master-Norna/yan/pull/17#issuecomment-6873568318" target="_blank" rel="noopener noreferrer"><code>#issuecomment-6873568318</code></a> 逐条收口剩余 18 条评审对话（3 项已修、14 项按约定范围不扩修、1 项不成立）。把最终 SHA、变更范围和验证日志一次性对齐，省得审阅人对着旧说明猜版本。</li>
+                </ol>
+              `
+            },
+            {
+              id: "sandbox-sec-9",
+              heading: "9. 边界照实留",
+              html: `
+                <ul>
+                  <li><strong>静态筛查不隔离子进程</strong>：获准运行的脚本仍拥有用户权限，脚本内部读写、运行时拼出来的路径或命令名、符号链接指向，以及多层 Shell 嵌套（如 <code>bash -c "bash -c 'sudo ...'"</code>）均不在 <code>sandbox.js</code> 能力之内；macOS 严档的系统级 <code>/usr/bin/sandbox-exec</code> 写盘收口是在后续 <a href="https://github.com/Master-Norna/yan/pull/75" target="_blank" rel="noopener noreferrer">PR #75</a> 另行接入的。</li>
+                  <li><strong>沿用“本 PR 回归必修、main 旧缺口不追补”的范围</strong>：<code>. iex $s</code>、<code>env -S</code>、POSIX <code>&lt;&lt;&lt;</code>、<code>--remove-source-'files'</code> 拆引号写法、<code>find</code>/<code>xargs</code> 复杂包装与未列出的 <code>plutil</code>、<code>PlistBuddy</code>、<code>chgrp</code>、<code>install</code>、<code>xattr</code> 本轮均未纳入。</li>
+                  <li><strong>刻意保留的保守误报</strong>：引号外的整词 <code>sudo</code>（含 <code>echo sudo x</code>、<code>echo x&gt;sudo</code>）、引号外 <code>)</code> 后的普通词（<code>Write-Host (Get-Date) shutdown</code> 在严/宽/审标疑），以及 heredoc 正文中带空格的 <code>eval (x)</code> 仍按偏保守方向拦下。</li>
+                  <li><strong>平台支持口径</strong>：按仓库 <a href="https://github.com/Master-Norna/yan/blob/3414c84e5cc136b2a7b22a83851ed8b3e15ad80d/CONTRIBUTING.md" target="_blank" rel="noopener noreferrer"><code>CONTRIBUTING.md</code></a> 约定，项目保持 Windows-first（两道 Windows CI 挡合并，macOS CI 作参考）；代码里的 POSIX 分支服务于 macOS <code>/bin/sh</code>，不承诺 Linux 支持。</li>
+                </ul>
+              `
+            },
+            {
+              id: "sandbox-sec-refs",
+              heading: "参考与证据",
+              html: `
+                <ul>
+                  <li><a href="https://github.com/Master-Norna/yan/issues/16" target="_blank" rel="noopener noreferrer">Issue #16：macOS 沙箱规则整理与判法确认</a></li>
+                  <li><a href="https://github.com/Master-Norna/yan/pull/17" target="_blank" rel="noopener noreferrer">PR #17：完整讨论、逐轮审查与合并记录</a></li>
+                  <li><a href="https://github.com/Master-Norna/yan/commit/3414c84e5cc136b2a7b22a83851ed8b3e15ad80d" target="_blank" rel="noopener noreferrer">上游 squash 合入提交 <code>3414c84</code></a> 与 <a href="https://github.com/CaramelizedCUDA/yan-local-chat/commit/4e447634d931fdf17bb340bf3be1a78710804b44" target="_blank" rel="noopener noreferrer">PR 最终 head <code>4e44763</code></a></li>
+                  <li><a href="https://github.com/Master-Norna/yan/blob/3414c84e5cc136b2a7b22a83851ed8b3e15ad80d/docs/sandbox.md" target="_blank" rel="noopener noreferrer">合入版 <code>docs/sandbox.md</code></a>、<a href="https://github.com/Master-Norna/yan/blob/3414c84e5cc136b2a7b22a83851ed8b3e15ad80d/server/work/index.js" target="_blank" rel="noopener noreferrer"><code>server/work/index.js</code></a>、<a href="https://github.com/Master-Norna/yan/blob/3414c84e5cc136b2a7b22a83851ed8b3e15ad80d/server/work/shell.js" target="_blank" rel="noopener noreferrer"><code>server/work/shell.js</code></a> 与 <a href="https://github.com/Master-Norna/yan/blob/3414c84e5cc136b2a7b22a83851ed8b3e15ad80d/server/work/paths.js" target="_blank" rel="noopener noreferrer"><code>server/work/paths.js</code></a></li>
+                  <li><a href="https://github.com/CaramelizedCUDA/yan-local-chat/blob/4e447634d931fdf17bb340bf3be1a78710804b44/server/sandbox.js#L1510-L1540" target="_blank" rel="noopener noreferrer"><code>hasHiddenCommand</code> 受限补查实现</a> 与 <a href="https://github.com/CaramelizedCUDA/yan-local-chat/blob/4e447634d931fdf17bb340bf3be1a78710804b44/test/unit/sandbox.test.mjs#L713-L757" target="_blank" rel="noopener noreferrer">入库回归矩阵</a></li>
+                  <li><a href="https://github.com/Master-Norna/yan/actions/runs/43563903000" target="_blank" rel="noopener noreferrer">最终 head CI 运行记录 #43563903000</a></li>
+                  <li>关键审查节点：<a href="https://github.com/Master-Norna/yan/pull/17#issuecomment-6661557023" target="_blank" rel="noopener noreferrer">sudo 与括号误伤</a>、<a href="https://github.com/Master-Norna/yan/pull/17#issuecomment-6685041139" target="_blank" rel="noopener noreferrer">落单引号遮蔽</a>、<a href="https://github.com/Master-Norna/yan/pull/17#issuecomment-6704937953" target="_blank" rel="noopener noreferrer">16.4 秒长注释与 heredoc 撇号</a>、<a href="https://github.com/Master-Norna/yan/pull/17#issuecomment-6847054931" target="_blank" rel="noopener noreferrer">外层 <code>$()</code> 求值</a>、<a href="https://github.com/Master-Norna/yan/pull/17#issuecomment-6860117259" target="_blank" rel="noopener noreferrer">纠偏 <code>. Invoke-Expression</code> 回归归类</a>、<a href="https://github.com/Master-Norna/yan/pull/17#issuecomment-6870364900" target="_blank" rel="noopener noreferrer">块注释残留与入库要求</a>、<a href="https://github.com/Master-Norna/yan/pull/17#issuecomment-6872924458" target="_blank" rel="noopener noreferrer">维护者最终验收</a>、<a href="https://github.com/Master-Norna/yan/pull/17#issuecomment-6873568318" target="_blank" rel="noopener noreferrer">合并后收尾同步</a></li>
+                  <li><a href="https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_quoting_rules?view=powershell-7.5" target="_blank" rel="noopener noreferrer">PowerShell 官方引号规则</a></li>
+                </ul>
+              `
+            }
+          ]
+        }
+,
+        {
           id: 'post-spawn-enoent',
           issueNo: 'ISSUE 01',
           pinned: true,
@@ -312,6 +1021,121 @@ const isFile = (path) =&gt; {
         }
 ,
         {
+          id: "post-codex-remote-provider",
+          issueNo: "ISSUE 04",
+          pinned: false,
+          category: "engineering",
+          categoryLabel: "工程与系统",
+          title: "Codex Remote 踩坑：明明用 Plus 登录，为什么还说供应商是 custom？",
+          subtitle: "安卓手机 ChatGPT Remote 连接 Windows 主机时旧对话能接着聊，发起新对话第一条消息却报 modelProviderMismatch。顺着 config.toml 与会话归档排查登录态、默认供应商 ID 与显示名的错位。",
+          summary: "排查安卓 ChatGPT Remote 连 Windows 主机新建对话报 This chat uses openai, but your current provider is custom：厘清 Plus 登录、model_provider ID 与显示名 OpenAI 三者关系，同步对齐 config.toml、387 个归档首行与 SQLite 索引（421 条），并记录无项目对话仍落回 C 盘的遗留问题。",
+          date: "2026-11-09",
+          readMinutes: 4,
+          wordCount: "2,551 字符",
+          cover: IMAGES.sunlitStreet,
+          tags: ["Codex","ChatGPT Remote","SQLite","配置迁移"],
+          specimen: {
+            eyebrow: "CAUSAL SEAM #04 · config.toml & SQLite Index",
+            title: "显示名叫 OpenAI，底层供应商 ID 却是 custom",
+            context: "手机 Remote 新会话写入 openai，单改主机默认 ID 又会导致旧会话反向失配",
+            lines: [
+              { type: 'ctx', text: "[model_providers.custom]  name = \"OpenAI\"  requires_openai_auth = true" },
+              { type: 'del', text: "model_provider = \"custom\"  # 新建报 uses openai, current is custom" },
+              { type: 'ins', text: "model_provider = \"openai\"  # 同步迁移归档首行与 SQLite 会话索引" }
+            ],
+            proof: "核对 387 个归档首行 + 解码 343 个压缩流 + SQLite 索引 421 条 openai / 0 条 custom（quick_check ok），手机端实测恢复"
+          },
+          tldr: [
+            "手机端 Remote 续聊已有对话正常，但新建对话首条消息即报 This chat uses openai, but your current provider is custom。",
+            "主机 config.toml 遗留 model_provider = \"custom\"（显示名虽为 OpenAI 且沿用 Plus 登录），与手机端新建会话固定使用的 openai 冲突。",
+            "隔离测试表明不能只改 config.toml：旧会话自身保存了供应商 ID，单改主机默认值会在续聊旧会话时反向报 modelProviderMismatch。",
+            "将默认配置、会话归档首行与 SQLite 索引统一对齐为 openai 后恢复新建与收发；但手机端「不指定项目」入口仍未遵循 D 盘工作目录设置。"
+          ],
+          boundaryNote: "迁移前提与遗留坑：本机并未实际接入第三方自定义端点，若正在使用自定义服务则切换 ID 会改变运行配置；此外手机端选择「不指定项目」新建会话仍落回 C 盘默认目录（参看 #44195）。",
+          footnote: "环境：Windows 主机（Codex 桌面后端 0.167.0-alpha.3.2，CODEX_HOME 位于 D 盘）+ Android ChatGPT Remote；文中本地用户名已脱敏。",
+          sections: [
+            {
+              id: "codex-sec-0",
+              heading: "现场：旧对话能聊，新建对话首条报错",
+              html: `
+                <p>2026 年 11 月 9 日，我用安卓手机上的 ChatGPT Remote 连接自己的 Windows 电脑。已经开着的 Codex 对话可以接着聊，但从手机发起新对话，发出去的第一条消息就报错：</p>
+                <blockquote><p>This chat uses openai, but your current provider is custom. Switch to openai to continue.</p></blockquote>
+                <p>我当时最困惑的是：明明一直用自己的 ChatGPT Plus 账号，怎么突然变成了 <code>custom</code>？查下来，报错里的“供应商”说的是 <strong>Codex 的模型供应商 ID</strong>。主机把默认 ID 和旧会话的供应商记录对齐到内置的 <code>openai</code> 后，手机实测恢复了新建和收发消息，全程没有重新登录。</p>
+              `
+            },
+            {
+              id: "codex-sec-1",
+              heading: "登录正常，为什么还会有两个供应商 ID？",
+              html: `
+                <p>先看 Windows 主机上的全局配置。我这台机器把 <code>CODEX_HOME</code> 放在 D 盘，实际读的是 <code>D:\\AI-Dev\\CodexHome\\config.toml</code>。修复前的备份里有这几行：</p>
+                <div class="code-figure">
+                  <div class="code-figure-bar">
+                    <span class="code-lang">TOML</span>
+                    <button type="button" class="code-copy-btn">复制代码</button>
+                  </div>
+                  <pre><code>model_provider = "custom"
+model = "gpt-6.1-sol"
+
+[model_providers.custom]
+name = "OpenAI"
+requires_openai_auth = true
+wire_api = "responses"</code></pre>
+                </div>
+                <p>这里有三个容易混淆的值：</p>
+                <div class="table-scroll">
+                  <table>
+                    <thead><tr><th>查什么</th><th>当时读到什么</th><th>它代表什么</th></tr></thead>
+                    <tbody>
+                      <tr><td>账号认证</td><td>ChatGPT 登录，Plus 订阅</td><td>我是用什么账号和方式登录的</td></tr>
+                      <tr><td><code>model_provider</code></td><td><code>custom</code></td><td>主机当前选择的模型供应商 ID</td></tr>
+                      <tr><td><code>model_providers.custom.name</code></td><td><code>OpenAI</code></td><td>这条供应商配置的显示名</td></tr>
+                    </tbody>
+                  </table>
+                </div>
+                <p><code>requires_openai_auth = true</code> 和实际读到的 ChatGPT 登录状态并不冲突。显示名虽然写着 <code>OpenAI</code>，配置的 ID 仍是 <code>custom</code>；截图里失败的那次交互则显示对话使用的是 <code>openai</code>。报错说的是这两个 ID 对不上。关于这两层设置，可以对照 <a href="https://learn.chatgpt.com/docs/auth" target="_blank" rel="noopener noreferrer">Codex 登录文档</a>和<a href="https://learn.chatgpt.com/docs/config-file/config-advanced#custom-model-providers" target="_blank" rel="noopener noreferrer">自定义模型供应商文档</a>。</p>
+                <p>更早的配置备份已经有同样的写法，所以至少能确定：<code>custom</code> 不是那次手机操作临时写进去的。没找到记录能说明它最初由谁写入，也没有证据把它归因于某次升级。备份里没找到显式配置的自定义端点，因此我也收回了最初对代理（第三方gateway接入）的猜测。理论上因为我曾经使用过CC Switch来从第三方供应商来使用Codex，这可能是供应商变为"custom"的一个猜测。但是考虑到时间过于遥远，现在我也不再使用CC Switch（甚至都卸载了），而是改用magpie（主要用于其它Agent Harness，比如Deepseek Harness和言。codex，devin，antigravity等这些使用官方账号登录的都不会用它）。因此我决定不再纠结这种奇怪的配置是从哪里来的，把注意力集中到该如何把这个供应商错误修好就行。</p>
+              `
+            },
+            {
+              id: "codex-sec-2",
+              heading: "为什么没有只改 config.toml？",
+              html: `
+                <p>正式动配置前，我先在隔离环境里用样本会话测试。主机默认值从 <code>custom</code> 切到 <code>openai</code> 后，新会话能创建；但接续原先标成 <code>custom</code> 的样本时，后端返回了方向正好相反的同类报错：</p>
+                <blockquote><p>This chat uses custom, but your current provider is openai. Switch to custom to continue.</p></blockquote>
+                <p>报错类型是 <code>modelProviderMismatch</code>。把样本会话的供应商元数据也对齐到 <code>openai</code> 后，普通历史和压缩历史都能接续。这一步解释了为什么不能只验证“新会话能开”：旧会话自己也保存了供应商 ID。隔离实验复现的是接续时的兼容性检查，没有追踪手机原始请求走过的每一层。</p>
+              `
+            },
+            {
+              id: "codex-sec-3",
+              heading: "实际改了什么，怎么知道修好了？",
+              html: `
+                <p>我在主机上将默认 <code>model_provider</code> 切到内置的 <code>openai</code>，保留原模型和 ChatGPT 登录，同时对齐本机旧历史里的供应商字段：一处在会话归档的首行，一处在 SQLite 会话索引。这是针对本机旧配置的迁移；若本来就在用自定义服务，切换供应商会改变运行配置，不能直接照搬。</p>
+                <p>实际执行中途断过一次，所以收尾以文件和后端读回的结果为准。备份留有原配置、原 SQLite 索引及计划修改文件的原始首行清单；中断前只复制了 4 个完整的压缩文件，没有备份全部压缩历史。</p>
+                <div class="table-scroll">
+                  <table>
+                    <thead><tr><th>验证</th><th>当时的结果</th></tr></thead>
+                    <tbody>
+                      <tr><td>桌面后端</td><td>Windows 桌面自带的 <code>0.167.0-alpha.3.2</code> 读到默认供应商为 <code>openai</code>；账号仍是 ChatGPT Plus；创建了一个 <code>openai</code> 临时会话</td></tr>
+                      <tr><td>历史与索引</td><td>核对 387 个归档首行，确认差异是供应商 ID；343 个压缩流完整解码。补正一条陈旧索引后，SQLite 索引有 421 条 <code>openai</code>、0 条 <code>custom</code>，<code>quick_check</code> 返回 <code>ok</code></td></tr>
+                      <tr><td>手机端到端</td><td>回到手机 Remote，发起一个新对话，发送测试消息并收到回复；之后又成功新建了两次</td></tr>
+                    </tbody>
+                  </table>
+                </div>
+                <p>公开资料里，<a href="https://github.com/openai/codex/issues/53848" target="_blank" rel="noopener noreferrer">Codex issue #53848</a> 也记录了安卓 Remote 新会话被标成 <code>openai</code>、主机默认仍是 <code>custom</code> 的情况。对方是在 macOS 上发现新对话完成后从列表消失；我遇到的是 Windows 上首条消息报错。这个报告能作旁证，但不能替代本机的复现，也不能证明两处故障走的是同一条代码路径。</p>
+              `
+            },
+            {
+              id: "codex-sec-4",
+              heading: "另一个坑：能新建了，但无项目对话去了 C 盘",
+              html: `
+                <p>修好后，我发现手机选择“不指定项目”时，新会话的工作目录仍在 <code>C:\\Users\\&lt;用户名&gt;\\Documents\\Codex\\2026-11-09\\…</code>。原来配置的 <code>desktop.projectlessWorkspaceRoot</code> 是 <code>D:\\AI-Dev\\CodexTasks</code>，桌面后端也读得出这个值。我把同一个值重新保存了一次，手机再建的测试会话依然用了 C 盘。这里看的是会话元数据里的工作目录（<code>cwd</code>）；配置和聊天记录仍在 D 盘的 <code>CodexHome</code>。</p>
+                <p><a href="https://github.com/openai/codex/issues/44195" target="_blank" rel="noopener noreferrer">Codex issue #44195</a> 报告了相近的 Windows + 安卓目录现象，不过对方额外遇到了项目受信任校验失败，我这边的测试消息正常完成。到这次排查结束，<strong>供应商不匹配已修复；手机无项目入口仍未遵循 D 盘工作目录设置。</strong> 因此，虽然修归修了，但是对于我这样喜欢把各种软件跟数据放在D盘的人来说，还是尽量不要在选择“无目录（No project）”的情况下创建新的remote会话最好 : )</p>
+              `
+            }
+          ]
+        }
+,
+        {
           id: 'post-rust-sync-bugs',
           issueNo: 'ISSUE 02',
           pinned: false,
@@ -510,510 +1334,19 @@ debug = 1</code></pre>
             }
           ]
         }
-,
-        {
-          id: 'post-macos-sandbox',
-          issueNo: 'ISSUE 03',
-          pinned: false,
-          category: 'architecture',
-          categoryLabel: '架构与工具',
-          title: '用 JavaScript 扩展 AI Agent 的 macOS 沙箱：从规则表到跨 Shell 语义',
-          subtitle: '为一个既有的 Node.js 应用层沙箱补齐 macOS 能力，真正困难的并不是多列几个危险命令，而是弄清哪些文本会被执行、哪些路径会被写入，以及修复之后如何证明没有破坏原来的判断。',
-          summary: '复盘「言」PR #17（基于最终 head 4e44763）：如何在既有 Node.js 本机桥接的静态命令筛查中扩展 macOS 规则、区分路径参数角色、处理 PowerShell 块注释与双引号 $() 遮蔽，并以红/绿回归矩阵、本地 E2E、4 项 CI 与上游 13,561 条回放各自交代证据边界。',
-          date: '2026-11-14',
-          readMinutes: 18,
-          wordCount: '10,447 字符',
-          cover: IMAGES.lanternReading,
-          tags: ['Node.js', '沙箱安全', 'PowerShell', '回归矩阵'],
-          specimen: {
-            eyebrow: 'CAUSAL SEAM #03 · server/sandbox.js',
-            title: '跨 Shell 引用与块注释遮蔽下的受限补查',
-            context: 'PR #17（head 4e44763）对 PowerShell 块注释与双引号 $() 的扫描修复（较 fe78d08 两文件 +74/-18）',
-            lines: [
-              { type: 'ctx', text: 'echo "$(. <# ordinary comment #> Invoke-Expression $s)"' },
-              { type: 'del', text: '仅扫默认视图：块注释结尾 # 被误作行注释起点，遮蔽 $() 内执行位置' },
-              { type: 'ins', text: 'return !dotComments && scanned.source.includes("<#") && hasHiddenCommand(shellText(scanned.source, scanned.shell, true), true);' }
-            ],
-            proof: '同一 32 项测试矩阵对照：fe78d08 (31/1) → 第一版块注释候选 (31/1) → 最终补丁 (32/0)'
-          },
-          tldr: [
-            '边界定位：属于 Node.js 本机桥接内的静态命令文本筛查与路径检查，不是操作系统内核级进程隔离，也非从零实现整套沙箱，既有权限流与执行器保持沿用。',
-            '语义优先：macOS 规则需识别动作（launchctl print 与 bootout）与参数角色（rsync 来源与 --remove-source-files），且不能将 Windows NTFS 数据流归一化套到 POSIX 冒号文件名。',
-            '最小受限修复：针对 PowerShell 点调用与 <# ... #> 块注释在双引号 $() 中的遮蔽，采用默认关闭的 dotComments 标志做受限补查（相对 fe78d08 两文件 +74/-18），不另写完整 PowerShell 解析器。',
-            '分开报告证据：沙箱单测矩阵由 31/1 升至 32/0 且最终 CI 四项全绿；同时严格区分 Mac 本地全量 E2E 1204/1（hover 已知波动）与上游另行报告的 13,561 条真实记录静态回放。'
-          ],
-          boundaryNote: '严格事实边界（4e44763）：静态筛查不完整分析脚本内部变量与任意多层 Shell 包装；Windows-first 仅指 CI 策略，POSIX 分支不等同承诺支持 Linux；不将 1.3–2× 特定样本开销或 352 次静态 API 核验扩写为通用复杂度或原生执行证明。',
-          footnote: '核验基准：PR #17 最终 head 4e447634d931fdf17bb340bf3be1a78710804b44 / 上游 squash 提交 3414c84e5cc136b2a7b22a83851ed8b3e15ad80d。本文针对指定版本与保留证据复盘，不构成覆盖全部 Shell 语法的安全审计结论。',
-          sections: [
-            {
-              id: 'sandbox-sec-0',
-              heading: '导语',
-              html: `
-                <p>最近参与「言」的 <a href="https://github.com/Master-Norna/yan/pull/17" target="_blank" rel="noopener noreferrer">PR #17</a>，工作从补齐 macOS 指令筛查，逐步延伸到 Shell 执行上下文、引号与命令替换、路径参数角色，以及跨平台回归验证。</p>
-                <p>这篇文章复盘的不是“用 JavaScript 从零造一个操作系统沙箱”，而是一个更具体的问题：<strong>在既有 AI Agent 工具链里，怎样扩展一层可解释、可测试的应用级防护，同时不把它的安全保证说过头。</strong></p>
-                <p>文中代码和结论以最终 PR head <code>4e44763</code> 为主要参照。以下涉及命令的例子用于说明筛查行为，不是执行建议；验证危险形状时只调用筛查函数，没有执行其中的系统修改动作。</p>
-              `
-            },
-            {
-              id: 'sandbox-sec-1',
-              heading: '一、先说清楚：这里的“沙箱”是什么',
-              html: `
-                <p>言的相关逻辑主要用 JavaScript 编写，运行在 Node.js 本机桥接中。模型提出命令或文件操作，桥接根据权限、沙箱档位和资源范围决定怎样处理，再调用子进程或文件 API。</p>
-                <p>可以把相关链路概括为：</p>
-                <div class="code-figure">
-                  <div class="code-figure-bar">
-                    <span class="code-lang">Architecture · Node.js 本机桥接链路</span>
-                    <button type="button" class="code-copy-btn">复制代码</button>
-                  </div>
-                  <pre><code>模型提出命令 / 文件工具调用
-             ↓
-       Node.js 本机桥接
-       ├─ 命令的静态筛查
-       ├─ 文件落点与机密路径检查
-       ├─ 应用自身存储敏感项保护
-       └─ 按配置选择请示、审查、执行或拒绝
-             ↓ 获准的操作
-       子进程 / 文件系统 API</code></pre>
-                </div>
-                <p>这是一张职责示意图，不表示所有操作都顺次经过同一组检查。不同权限和沙箱配置会选择不同分支。</p>
-                <p>底层命令执行仍使用 Node.js 的 <code>child_process.spawn</code>：Windows 走 PowerShell，macOS 走 <code>/bin/sh</code>。JavaScript 是实现这些防护逻辑的语言，不是说工具只能运行 JavaScript，也不是在 Node.js 的 <code>vm</code> 上下文里隔离一段 JS。</p>
-                <p>最重要的边界，仓库文档已经说得很直接：</p>
-                <blockquote><p>这是静态筛查，不是进程隔离。</p></blockquote>
-                <p>它没有因为多写了一层 JavaScript，就让子进程获得低于用户的系统权限，也没有给任意脚本建立操作系统级的文件、网络或系统调用隔离。被允许的脚本仍然以用户权限运行，脚本内部的代码不在这层命令文本筛查的完整分析范围内。</p>
-                <p>因此，“基于 JavaScript、扩展到 macOS 的应用层沙箱”是合适的描述；“macOS 原生隔离沙箱”或“可以安全执行任意代码”则不是。</p>
-
-                <h3 id="sandbox-existing-vs-new">哪些原来就有，哪些是这次扩展的</h3>
-                <div class="table-scroll">
-                  <table>
-                    <thead>
-                      <tr>
-                        <th>层次</th>
-                        <th>既有能力</th>
-                        <th>本 PR 的主要工作</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      <tr>
-                        <td>工具执行与权限</td>
-                        <td>Node.js 桥接、命令执行、文件工具，以及请示和审查流程</td>
-                        <td>沿用既有执行链路，没有另造一个执行后端</td>
-                      </tr>
-                      <tr>
-                        <td>路径、环境与应用配置</td>
-                        <td>工作目录约束、机密文件检查、机密环境变量过滤、存储根敏感项保护</td>
-                        <td>保留这些职责，并修正涉及跨平台路径解释的部分细节</td>
-                      </tr>
-                      <tr>
-                        <td>命令规则</td>
-                        <td>原有 Windows 相关筛查</td>
-                        <td>补齐 macOS 命令类别、提权与动态执行相关判定</td>
-                      </tr>
-                      <tr>
-                        <td>语法理解</td>
-                        <td>原有指令位匹配与筛查逻辑</td>
-                        <td>增加、统一引号与执行上下文扫描，处理多种包装、命令替换和参数角色</td>
-                      </tr>
-                      <tr>
-                        <td>验证</td>
-                        <td>原有单元、类型、格式与端到端检查</td>
-                        <td>扩充跨平台用例，在后续修复中将指定回归矩阵入库</td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
-                <p>这个区分很重要：不能把项目已有的权限系统和执行器，都算成本次从零实现的成果。</p>
-              `
-            },
-            {
-              id: 'sandbox-sec-2',
-              heading: '二、三档权限、两档沙箱，不等于“四级权限”',
-              html: `
-                <p>理解这套实现，还要分清几组容易混淆的概念。</p>
-                <p>用户操作层有“问而后行、审而后行、径行”三档权限；沙箱本身有严、宽两种主要筛查范围。两者相关，但不是同一个开关。</p>
-                <p>例如，严档侧重工作目录、机密路径和命令限制；宽档主要守住明确会伤及系统的动作，不再把普通目录外写入、联网等行为一概作为沙箱拒绝项。严档拒下的命令，也可能进入用户明确批准、单条出沙箱执行的流程。因此，<strong>某个筛查函数返回拒绝，不等于整个产品在任何配置下都绝不允许这项操作。</strong></p>
-                <p>代码中经常一起验证的四个入口，又是另一组分工：</p>
-                <div class="table-scroll">
-                  <table>
-                    <thead>
-                      <tr>
-                        <th>入口</th>
-                        <th>主要职责</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      <tr>
-                        <td><code>screenCommand</code></td>
-                        <td>严档命令筛查，包含写入路径等限制</td>
-                      </tr>
-                      <tr>
-                        <td><code>screenLoose</code></td>
-                        <td>宽档沙箱筛查，主要保护系统本身</td>
-                      </tr>
-                      <tr>
-                        <td><code>screenAutoReview</code></td>
-                        <td>审而后行的规则筛查</td>
-                      </tr>
-                      <tr>
-                        <td><code>screenUnreviewable</code></td>
-                        <td>审查批准之后仍不能越过的特定底线，如直接调用自身桥接、部分动态执行形状</td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
-                <p>四个函数不是四个递增的用户权限等级，更不是四个操作系统隔离级别。存储根中配置、备份和登录文件的保护，还由独立检查承担，不能只看这四个函数就推断所有路径都会被怎样处理。</p>
-                <p>另外，<code>sandboxEnv</code> 会按变量名过滤像机密的环境变量，并在套用沙箱的子进程启动路径中使用它。这能减少凭据直接继承，却不等于隔离了凭据的所有来源：文件、脚本或其他服务中的信息，并不会因为过滤了环境变量就自动消失。</p>
-              `
-            },
-            {
-              id: 'sandbox-sec-3',
-              heading: '三、macOS 适配：规则要认识“动作”，而不只是程序名',
-              html: `
-                <p>最直观的新增能力，是为 macOS 常见系统工具补规则。下面只列几个代表，不是完整支持清单：</p>
-                <div class="table-scroll">
-                  <table>
-                    <thead>
-                      <tr>
-                        <th>工具</th>
-                        <th>查询或普通文本示例</th>
-                        <th>需要限制的动作类别</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      <tr>
-                        <td><code>launchctl</code></td>
-                        <td><code>list</code>、<code>print</code></td>
-                        <td>加载、卸载、启停和修改服务配置</td>
-                      </tr>
-                      <tr>
-                        <td><code>defaults</code></td>
-                        <td><code>read</code>、<code>domains</code></td>
-                        <td>写入、删除、导入或重命名设置</td>
-                      </tr>
-                      <tr>
-                        <td><code>crontab</code></td>
-                        <td><code>-l</code></td>
-                        <td>编辑、删除或安装计划任务</td>
-                      </tr>
-                      <tr>
-                        <td><code>diskutil</code></td>
-                        <td><code>list</code>、<code>info</code></td>
-                        <td>擦除、分区和部分 APFS 修改</td>
-                      </tr>
-                      <tr>
-                        <td><code>networksetup</code></td>
-                        <td>查询与列表参数</td>
-                        <td>修改网络服务和配置</td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
-                <p>这些已识别动作在严、宽、审规则中受到限制；是否可进入用户批准或审查流程，还取决于前面提到的权限配置。不能把“筛查命中”简化成所有模式下的绝对禁止。</p>
-                <p>同时，规则也不能看到 <code>launchctl</code> 就拦。例如：</p>
-                <div class="code-figure">
-                  <div class="code-figure-bar">
-                    <span class="code-lang">Shell · 非服务修改示例</span>
-                    <button type="button" class="code-copy-btn">复制代码</button>
-                  </div>
-                  <pre><code>launchctl print gui/501
-command -v launchctl
-echo "launchctl bootout gui/501/com.example.service"</code></pre>
-                </div>
-                <p>三行分别是查询、查找命令，以及输出普通文本，不应因为包含同一个程序名而一起被当成服务修改。</p>
-                <p>这次实现把 macOS 与 Windows 规则放进共用清单，而不是按宿主平台拆成两套互不相干的黑名单。平台差异主要体现在路径和 Shell 语义等地方。<strong>同一份规则表可以共用，不代表所有平台都按同一种 Shell 语法解析。</strong></p>
-                <p>还有刻意保守的例外：<code>sudo</code> 除了指令位判断，还使用去掉引号内容后的整词检查，甚至会命中 <code>echo sudo x</code>。这是一项有明确误报取舍的策略，不能把整套实现描述成“所有命令都精确到真实执行位、绝无误报”。</p>
-              `
-            },
-            {
-              id: 'sandbox-sec-4',
-              heading: '四、路径不是普通字符串：来源、目标和选项值的角色不同',
-              html: `
-                <p>把 Windows 逻辑移到 macOS，也不是把反斜杠换成正斜杠这么简单。</p>
-                <p>先看一个同步场景：</p>
-                <div class="code-figure">
-                  <div class="code-figure-bar">
-                    <span class="code-lang">Shell · rsync 参数角色示例</span>
-                    <button type="button" class="code-copy-btn">复制代码</button>
-                  </div>
-                  <pre><code>rsync -a --exclude node_modules /Users/example/source/ ./backup/</code></pre>
-                </div>
-                <p>如果当前工作目录是项目目录，源目录在外、目标目录在内，这仍可能是合理的导入操作。简单规定“命令中出现目录外路径就拒绝”，会把只读来源一起拦下。</p>
-                <p>反过来，也不能把某个参数一律当作只读来源。<code>rsync --remove-source-files</code> 会删除来源，来源就不能继续享受相同豁免。</p>
-                <p>因此，这部分实现需要识别有限的参数角色：</p>
-                <ul>
-                  <li>哪个是被支持形式中的来源路径；</li>
-                  <li>哪个是目标、日志或临时目录等写入参数；</li>
-                  <li>哪个只是过滤模式、sed 脚本或选项值，不该当作写入路径。</li>
-                </ul>
-                <p>PR 为 <code>rsync</code>、<code>ditto</code>、<code>sed</code> 等补充了相关处理，并扩充 <code>chmod</code>、<code>chown</code>、<code>chflags</code>、<code>ln</code> 等写动词识别。这里做的是有限语法下的参数分析，不是完整模拟每个工具所有版本的行为。</p>
-                <p>另一个细节是冒号。Windows 的 NTFS 数据流写法，与 macOS 路径中的普通冒号不是同一种语义。为防止 Windows 数据流路径绕过而做的归一化，不能无条件套到非 Windows 文件名上。相应处理需要保留平台条件，存储根检查中的斜杠归一化也要与实际路径比较分开看。</p>
-                <p><strong>归一化不是越多越安全。按错平台归一化，本身就可能改变安全判断。</strong></p>
-                <p>结构化文件工具另外有自己的路径与链接检查。这与命令文本筛查是两条不同的防护路径，不能把其中一条的能力推定到另一条上，更不能理解成对子进程所有文件访问的强制隔离。</p>
-              `
-            },
-            {
-              id: 'sandbox-sec-5',
-              heading: '五、为什么 macOS 扩展最终会遇到 PowerShell 回归',
-              html: `
-                <p>原因在于共用扫描逻辑。</p>
-                <p>macOS 命令规则增加之后，还要处理前缀、包装和引用：<code>env</code> 后面有真正的命令，<code>bash -c</code> 的参数里可能有可执行文本，普通引号参数中的括号却不该制造新的指令位。</p>
-                <p>PR 因此不仅增加了规则，也引入了更细的扫描上下文。实现使用引号收尾缓存、命令替换收尾表和显式扫描栈，在有限范围内区分普通文本与执行内容，而不是对所有输入只跑一个无上下文的关键词表达式。</p>
-                <p>这不是完整的 Shell 解析器，但它已经必须面对解释顺序。例如，在 PowerShell 上下文中：</p>
-                <div class="code-figure">
-                  <div class="code-figure-bar">
-                    <span class="code-lang">PowerShell · 外层双引号求值示例</span>
-                    <button type="button" class="code-copy-btn">复制代码</button>
-                  </div>
-                  <pre><code>bash -c "echo '$(Write-Output SAFE)'"</code></pre>
-                </div>
-                <p>不能因为看到了“内层单引号”，就把其中的 <code>$()</code> 当作不会执行的字面量：它首先处于外层 PowerShell 的双引号中，外层会先求值，再把结果交给 Bash。PowerShell 官方引号规则也明确区分了双引号中的表达式展开与单引号字面量。</p>
-                <p>这条经验可以推广为：</p>
-                <blockquote><p>安全筛查应跟着真正的解释顺序走，而不是凭肉眼看到的最内层引号决定整段文本的含义。</p></blockquote>
-                <p>也正因为底层逻辑共用，修正 macOS/POSIX 相关行为时，仍然需要保护 Windows/PowerShell 已有判定。仓库本身是 Windows-first：Windows 两项主要 CI 必须通过，macOS 测试只作参考；代码中存在 POSIX 分支，也不等于项目承诺支持 Linux。</p>
-              `
-            },
-            {
-              id: 'sandbox-sec-6',
-              heading: '六、一个典型回归：从关键词误报，到漏掉真正的调用',
-              html: `
-                <p>这次修复过程中，<code>Invoke-Expression</code> 很能说明问题。</p>
-                <p>如果只按单词匹配，普通搜索就容易被误伤：</p>
-                <div class="code-figure">
-                  <div class="code-figure-bar">
-                    <span class="code-lang">Shell · 搜索负例</span>
-                    <button type="button" class="code-copy-btn">复制代码</button>
-                  </div>
-                  <pre><code>rg Invoke-Expression src
-git log -S Invoke-Expression</code></pre>
-                </div>
-                <p>但把规则收紧到“看起来像命令名的位置”，也可能漏掉原先拦住的执行形状。较早的一版候选补丁，就被独立复核发现会放过 <code>Invoke-Expression($s)</code>、部分括号调用和赋值右侧写法。那版候选因此被退回修改，没有作为最终补丁发布。</p>
-                <p>后续又发现，点调用不能拿另一个名字相近的例子来代替判断：</p>
-                <div class="code-figure">
-                  <div class="code-figure-bar">
-                    <span class="code-lang">PowerShell · 点调用对照</span>
-                    <button type="button" class="code-copy-btn">复制代码</button>
-                  </div>
-                  <pre><code>. Invoke-Expression $s
-. iex $s</code></pre>
-                </div>
-                <p>上游 main 对第一条会拦，对第二条却存在既有漏判。因此，“main 也放过 <code>. iex</code>”不能证明“. Invoke-Expression 的放行只是旧缺口”。正确比较必须是：<strong>同一条完整输入，在 main、PR 当前版本和候选补丁上的结果。</strong></p>
-                <p>这一步最值得复盘的，并不是正则少写了哪几个字符，而是分类方法出了偏差：把语义相近、名字不同的样例，当成了是否回归的充分对照。</p>
-                <p>本文提到的 P1/P2，沿用该 PR 讨论和独立复核中的优先级，不是另行发布的 CVE 或 CVSS 结论。</p>
-
-                <h3 id="sandbox-block-comment">普通块注释又暴露了一层边界</h3>
-                <p>点调用和反引号续行补齐后，维护者继续指出：</p>
-                <div class="code-figure">
-                  <div class="code-figure-bar">
-                    <span class="code-lang">PowerShell · 块注释点调用</span>
-                    <button type="button" class="code-copy-btn">复制代码</button>
-                  </div>
-                  <pre><code>. &lt;# ordinary comment #&gt; Invoke-Expression $s
-. &lt;# ordinary comment #&gt; 'Invoke-Expression' $s
-$r = . &lt;# ordinary comment #&gt; Invoke-Expression $s</code></pre>
-                </div>
-                <p>PowerShell 允许普通块注释放在代码中间，点调用仍然成立。维护者还在 Windows PowerShell 5.1 和 PowerShell 7 上，用只输出固定标记的内容验证了相应调用，不是仅凭字符串猜测。</p>
-                <p>而筛查逻辑当时只把空白和真实反引号续行当作点号与命令名之间的间隔，遇到 <code>&lt;# ... #&gt;</code> 就断开了。</p>
-                <p>第一版块注释修复补上了直接调用，却仍漏掉另一个普通上下文：</p>
-                <div class="code-figure">
-                  <div class="code-figure-bar">
-                    <span class="code-lang">PowerShell · 双引号 $() 内块注释</span>
-                    <button type="button" class="code-copy-btn">复制代码</button>
-                  </div>
-                  <pre><code><span class="code-line-highlight">echo "$(. &lt;# ordinary comment #&gt; Invoke-Expression $s)"</span></code></pre>
-                </div>
-                <p>这里的 <code>$()</code> 在双引号中仍会求值。独立复核发现，问题已经不只在“跳过注释后能否认出名字”：原有行注释处理会在相关扫描路径把块注释结尾处的 <code>#</code> 当成行注释起点，影响 <code>$()</code> 收尾配对，导致执行位置没有暴露给后续规则。</p>
-                <p><strong>如果候选位置在前一阶段已经被遮掉，继续扩充后一阶段的命令名正则，就补不回来。</strong></p>
-              `
-            },
-            {
-              id: 'sandbox-sec-7',
-              heading: '七、最终处理：复用扫描器，只给特定规则一次受限补查',
-              html: `
-                <p>最后一轮没有把共用扫描结果整体换成另一种解释，也没有顺势实现一个完整 PowerShell 解析器。</p>
-                <p>处理分为两部分。</p>
-                <p>第一，在已经确认的点调用候选处，保留并读取扫描输入原文，按当前位置跳过普通块注释、行内空白和真实反引号续行，再确认完整的 <code>Invoke-Expression</code> 名字，包括成对单、双引号形式。</p>
-                <p>这里使用 sticky 正则游标，意思是“只能从当前位置继续识别间隔”，不是在后面随便找一个命令名。语法视图会标记转义字符，原文检查则用于区分真正的续行与其他转义，不能把所有转义都当成空白。</p>
-                <p>第二，为双引号 <code>$()</code> 的配对问题，在既有扫描流程中传递一个默认关闭的 <code>dotComments</code> 标志。原 HIDDEN 检查没有确认命中、且输入含 <code>&lt;#</code> 时，才运行一次专用扫描流程。</p>
-                <p>实际代码末尾的控制条件如下，这是函数片段，不是完整实现：</p>
-                <div class="code-figure">
-                  <div class="code-figure-bar">
-                    <span class="code-lang">JavaScript · server/sandbox.js 控制条件片段</span>
-                    <button type="button" class="code-copy-btn">复制代码</button>
-                  </div>
-                  <pre><code><span class="code-line-highlight">return !dotComments &amp;&amp;</span>
-<span class="code-line-highlight">  scanned.source.includes("&lt;#") &amp;&amp;</span>
-<span class="code-line-highlight">  hasHiddenCommand(</span>
-    shellText(scanned.source, scanned.shell, true),
-    true
-  );</code></pre>
-                </div>
-                <p>它的约束比“再扫一遍”更重要：</p>
-                <ol>
-                  <li>第二次调用不会再次触发自身补查。</li>
-                  <li>补查只接受“点调用 + 块注释 + 完整命令名”这一类目标。</li>
-                  <li>其他规则继续使用原视图，不拿补查结果顺便扩展判断范围。</li>
-                  <li>正常路径已经确认的命中优先返回，不由补查取消。</li>
-                </ol>
-                <p>相对 <code>fe78d08</code>，最后这一轮只改两个文件，合计 <strong>+74/-18</strong>；整个 PR 的合并变更则涉及七个文件。二者不是同一统计口径。</p>
-                <p>这里的“最小修改”，指的是尽量限制修复对其他规则和默认语义的影响，不是追求正则表达式最短，也不是宣称已经找到数学意义上行数最少的方案。</p>
-              `
-            },
-            {
-              id: 'sandbox-sec-8',
-              heading: '八、验证的关键，不只是让新版本变绿',
-              html: `
-                <h3 id="sandbox-val-red-green">1. 让回归测试先证明自己会失败</h3>
-                <p>维护者明确要求：点调用、续行、块注释和普通搜索负例，不能只留在仓库外的临时探针中。</p>
-                <p>最终在原有沙箱测试项里扩充了矩阵：三种命令名形式、直接调用/赋值 RHS/裸 <code>$()</code>、九种间隔，再补普通块注释下的双引号 <code>$()</code> 包装及搜索负例。没有新增测试文件或无关顶层测试项。</p>
-                <p>顶层测试数仍是 32，但内部断言已经增加。“32 项测试通过”既不表示只测了 32 条命令，也不能拿来声称“没有新增断言”。</p>
-                <p>独立复核把同一套新断言分别用于不同生产源码，结果是：</p>
-                <div class="table-scroll">
-                  <table>
-                    <thead>
-                      <tr>
-                        <th>被测源码</th>
-                        <th>结果</th>
-                        <th>抓到的问题</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      <tr>
-                        <td><code>fe78d08</code></td>
-                        <td>31 通过、1 失败</td>
-                        <td>普通块注释点调用</td>
-                      </tr>
-                      <tr>
-                        <td>第一版块注释候选</td>
-                        <td>31 通过、1 失败</td>
-                        <td>双引号 <code>$()</code> 中的同类残留</td>
-                      </tr>
-                      <tr>
-                        <td>最终补丁</td>
-                        <td>32 通过、0 失败</td>
-                        <td>上述指定回归通过</td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
-                <p>这比单独报告“最终绿了”更有说服力：新增测试确实能抓住旧问题，也能区分一个不完整修复与最终候选。</p>
-
-                <h3 id="sandbox-val-review">2. 修复与复核分开，但不把独立复核神化</h3>
-                <p>修复在 macOS 会话中进行，再交给未实现这份补丁的独立会话检查。复核不只重跑报告，还比较基线、候选、普通搜索负例、四个入口和旧场景，并核对实际补丁。</p>
-                <p>最终复核中，1398 行对照的默认扫描视图与基线一致，旧场景矩阵也没有发现阻塞回退。这些是“默认行为尽量不被这条专用补查改变”的定向证据，不是对所有输入的形式化证明。</p>
-                <p>一次候选修复即使已有测试通过，仍可能被新的机制探针发现问题；反过来，独立复核给出“本轮范围可推”，也不等于实现了全部 Shell 语法。</p>
-
-                <h3 id="sandbox-val-perf">3. 性能必须检查，也必须承认额外成本</h3>
-                <p>扫描器通过收尾缓存、显式栈和失败结果缓存，减少重复扫描。块注释专用路径中，也要避免对同一未闭合后缀反复查找。</p>
-                <p>定向长输入测试没有观察到新增平方级或指数级退化。但部分含标记、原检查未命中的长串，会付出额外扫描的常数开销；独立测量中的部分样本约为基线的 1.3–2 倍。</p>
-                <p>这组对照是在 macOS 上对筛查 API 预热后，取五次测量的中位数，不是原生 Shell 执行耗时，也不代表日常命令一律增加相同开销。</p>
-                <p>所以，准确结论是“在已测输入家族中未见新增非线性退化”，不是“零性能成本”，更不是仅凭几个耗时数字就证明最坏复杂度。</p>
-
-                <h3 id="sandbox-val-ci">4. 本地 macOS 结果与最终 CI，必须分开报告</h3>
-                <p>最后一轮完整补丁的本地参考验证是：</p>
-                <div class="table-scroll">
-                  <table>
-                    <thead>
-                      <tr>
-                        <th>检查</th>
-                        <th>结果</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      <tr>
-                        <td>沙箱单测</td>
-                        <td>32 通过、0 失败</td>
-                      </tr>
-                      <tr>
-                        <td>类型检查</td>
-                        <td>通过</td>
-                      </tr>
-                      <tr>
-                        <td>全仓 Prettier 检查</td>
-                        <td>通过</td>
-                      </tr>
-                      <tr>
-                        <td><code>npm test</code> 单元部分</td>
-                        <td>448 通过、0 失败、3 跳过</td>
-                      </tr>
-                      <tr>
-                        <td><code>npm test</code> 端到端部分</td>
-                        <td>1204 通过、1 失败，整体退出码为 1</td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
-                <p>唯一端到端失败是悬停提示断言。此前同一 <code>fe78d08</code> 原基线也复现过该失败；最新基线与补丁的单例检查则都为 15/0。</p>
-                <p>这些证据支持“它不是本补丁独有、存在既有波动”的判断，却不能把本次全量运行写成通过，也不能说已经定位了不稳定的最终根因。</p>
-                <p>最终 head 的 CI 则是另一组结果：Windows 单元/类型/格式、Windows 全量端到端、Node 22 单元以及 macOS 参考任务，四个 job 均完成并通过。</p>
-                <p>在 macOS 上给函数传入 <code>platform: "win32"</code>，只是在测试 Windows 静态筛查分支，不是原生 Windows/PowerShell 执行验证。两种证据都需要，但不能互相冒充。</p>
-
-                <h3 id="sandbox-val-replay">5. 真实历史回放与构造探针，各自回答不同问题</h3>
-                <p>维护者在最终验收中另行报告：重新静态回放 <strong>13,561 条真实记录</strong>，其中言 4,350 条、Claude Bash 9,211 条，按来源、工作目录与指令去重。对照 <code>fe78d08</code> 与 <code>4e44763</code>，win32/darwin 四个入口的判定均无变化。回放只调用筛查函数，没有执行历史命令。</p>
-                <p>这不是修复会话自行完成的数据，也不能借来证明所有块注释形状都已覆盖。</p>
-                <p>它说明的是：在这批真实使用记录里，没有观察到判定变化。新增回归是否修复，则由额外构造样例和红/绿测试证明。<strong>历史语料擅长发现现实误伤，机制探针擅长探索语料尚未出现的结构，两者不能互相替代。</strong></p>
-              `
-            },
-            {
-              id: 'sandbox-sec-9',
-              heading: '九、这次做得不够好的地方',
-              html: `
-                <p>复盘不能只留下最终方案，几次绕路同样值得记下来。</p>
-                <p><strong>第一，把范围收窄误当成覆盖更准确。</strong> 为消除关键词误报而收紧执行位时，没有一次保住所有原有调用形状。改进办法不是无限扩测试，而是在修改识别边界时，同时列出必须保持的正例与负例。</p>
-                <p><strong>第二，用相似命令代替同一输入对照。</strong> <code>. iex</code> 的旧漏判不能替 <code>. Invoke-Expression</code> 的新回归开脱。以后判断“既有边界还是本 PR 引入”，先做同输入、同平台模式、同入口的版本对照。</p>
-                <p><strong>第三，临时探针没有及时变成持续回归保护。</strong> 点调用和续行阶段的外部探针能帮助定位，却不会随仓库 CI 自动运行。后来根据上游要求确认范围，将指定断言加入原有测试项，才补上这一环。</p>
-                <p><strong>第四，代码、验证说明与 PR 正文没有同步完成。</strong> 最新代码已经推送，正文却还保留旧 head 和“本轮未新增或修改测试”。维护者再次指出后，最终在合并后补齐了说明。这不是代码运行错误，却会让读者无法判断一组结果究竟验证了哪个版本。</p>
-                <p>更合理的交付顺序应是：确定最终补丁和身份、推送、核对该 head 的检查，再把正文与评论同步到同一版本；不能把“代码推上去了”当成交付已经完整结束。</p>
-              `
-            },
-            {
-              id: 'sandbox-sec-10',
-              heading: '十、结论：扩展的是防护能力，不是无限的安全承诺',
-              html: `
-                <p>这次 PR 没有引入新的 npm 运行时依赖，没有另写一套 macOS 执行器。主要工作是在既有 Node.js 工具链里补齐规则、统一有限的执行上下文扫描，并用跨平台对照守住已有行为。</p>
-                <p>但它仍然不是一个能约束任意代码的隔离环境：</p>
-                <ul>
-                  <li>不能完整分析脚本内部、运行时变量和任意多层 Shell 包装；</li>
-                  <li>命令文本筛查不等于跟踪子进程实际经过的所有文件路径；</li>
-                  <li>参数支持与规则覆盖都有边界，未识别的写法不一定会被拒绝；</li>
-                  <li>已知低影响文字误报、复杂注释或后续多条调用的组合，并未全部修尽；</li>
-                  <li>“main 已有缺口”“本 PR 回归”和“本轮未覆盖”必须分别说明，不能统称已经修复。</li>
-                </ul>
-                <p>最终，维护者在复核与 CI 通过后，合并了 PR #17。真正可迁移的经验，不是那几条 macOS 命令规则，而是下面三件事：</p>
-                <ol>
-                  <li><strong>在执行之前设检查，比只在提示词里要求模型谨慎更具体；但应用层检查不是操作系统隔离。</strong></li>
-                  <li><strong>跨平台适配的核心是解释语义与资源角色，而不只是命令名和路径分隔符。</strong></li>
-                  <li><strong>安全修复需要一条可追溯的证据链：同输入对照、旧版红灯、新版绿灯、负例保留、独立复核，以及与最终版本对应的说明。</strong></li>
-                </ol>
-                <p>把边界说清楚，并不削弱这层防护的价值。恰恰相反，只有知道它在哪里可靠、哪里必须依赖其他机制，才谈得上正确使用它。</p>
-              `
-            },
-            {
-              id: 'sandbox-sec-refs',
-              heading: '资料与证据',
-              html: `
-                <hr />
-                <ul>
-                  <li><a href="https://github.com/Master-Norna/yan/pull/17" target="_blank" rel="noopener noreferrer">PR #17：完整讨论与合并记录</a></li>
-                  <li><a href="https://github.com/Master-Norna/yan/blob/3414c84e5cc136b2a7b22a83851ed8b3e15ad80d/CONTRIBUTING.md" target="_blank" rel="noopener noreferrer">贡献规范：Windows-first、macOS 参考、CI 与 squash 流程</a></li>
-                  <li><a href="https://github.com/Master-Norna/yan/blob/3414c84e5cc136b2a7b22a83851ed8b3e15ad80d/docs/sandbox.md" target="_blank" rel="noopener noreferrer">合并版本的沙箱文档：权限、隔离边界与 macOS 规则</a></li>
-                  <li><a href="https://github.com/Master-Norna/yan/blob/3414c84e5cc136b2a7b22a83851ed8b3e15ad80d/server/work/index.js" target="_blank" rel="noopener noreferrer">合并版本的工具路由</a>、<a href="https://github.com/Master-Norna/yan/blob/3414c84e5cc136b2a7b22a83851ed8b3e15ad80d/server/work/shell.js" target="_blank" rel="noopener noreferrer">Shell 执行器</a>与<a href="https://github.com/Master-Norna/yan/blob/3414c84e5cc136b2a7b22a83851ed8b3e15ad80d/server/work/paths.js" target="_blank" rel="noopener noreferrer">路径工具</a></li>
-                  <li><a href="https://github.com/Master-Norna/yan/pull/17#issuecomment-6860117259" target="_blank" rel="noopener noreferrer">维护者纠正点调用回归的归类</a></li>
-                  <li><a href="https://github.com/Master-Norna/yan/pull/17#issuecomment-6870364900" target="_blank" rel="noopener noreferrer">维护者指出普通块注释残留并要求入库断言</a></li>
-                  <li><a href="https://github.com/CaramelizedCUDA/yan-local-chat/commit/4e447634d931fdf17bb340bf3be1a78710804b44" target="_blank" rel="noopener noreferrer">最终一轮补丁：相对 fe78d08 的两文件修改</a></li>
-                  <li><a href="https://github.com/CaramelizedCUDA/yan-local-chat/blob/4e447634d931fdf17bb340bf3be1a78710804b44/server/sandbox.js#L1510-L1540" target="_blank" rel="noopener noreferrer">受限补查实现</a>与<a href="https://github.com/CaramelizedCUDA/yan-local-chat/blob/4e447634d931fdf17bb340bf3be1a78710804b44/test/unit/sandbox.test.mjs#L713-L757" target="_blank" rel="noopener noreferrer">入库回归矩阵</a></li>
-                  <li><a href="https://github.com/Master-Norna/yan/actions/runs/43563903000" target="_blank" rel="noopener noreferrer">最终 head 的 CI</a></li>
-                  <li><a href="https://github.com/Master-Norna/yan/pull/17#issuecomment-6872924458" target="_blank" rel="noopener noreferrer">维护者最终验收：定向检查、真实记录回放与 CI 口径</a></li>
-                  <li><a href="https://github.com/Master-Norna/yan/pull/17#issuecomment-6873568318" target="_blank" rel="noopener noreferrer">合并后的验证与范围说明</a></li>
-                  <li><a href="https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_quoting_rules?view=powershell-7.5" target="_blank" rel="noopener noreferrer">PowerShell 官方引号规则</a></li>
-                </ul>
-                <p>本文是针对上述版本与证据的工程复盘，不是覆盖全部 Shell 语法的安全审计结论，也不承诺后续版本行为不变。</p>
-              `
-            }
-          ]
-        }
-
       ];
 
       const MICRO_LOGS = [
+        {
+          date: '11.16',
+          tag: 'Ctx / Upstream #6',
+          text: '切到 Orchestrator (Carbon) 后状态胶囊突然飘红 Ctx 400k/256k (156%)：只读拆解会话 SQLite 的 gen_metadata Protobuf 字段，确认 Carbon 真实窗口已下发为 512k（实占 78%），只是本机停在旧版 v5.2.0 仍按固定 256k 分母估算；升至合入 PR #6 的 v5.3.0 后自动恢复 /512k 动态读数。'
+        },
+        {
+          date: '11.16',
+          tag: 'CDP / Upstream #12',
+          text: '本地预览本站时撞见标题「先正常、120ms 后白底白字隐身」的怪象：原来 Antigravity 主题补丁仅按 127.0.0.1 前缀过滤 CDP 目标，把内置浏览器里的本地页也当成宿主强刷了 body 配色与汉化词典（外加 NewDocument 期 documentElement 空指针）；补上宿主独占指纹三态门禁后已提交上游 #11 / PR #12。'
+        },
         {
           date: '11.15',
           tag: '随笔 / 建站',
