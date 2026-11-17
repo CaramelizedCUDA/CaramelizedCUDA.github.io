@@ -12,6 +12,8 @@
           readMinutes: 8,
           wordCount: "4,712 字符",
           cover: IMAGES.ogPr75Macos,
+          coverFit: "contain",
+          coverBg: "#0b0f12",
           tags: ["macOS","sandbox-exec","竞态排障","Git Data API"],
           specimen: {
             eyebrow: "CAUSAL SEAM #05 · shell.js & watchBackground",

@@ -1316,6 +1316,10 @@
       transform: scale(1.04);
     }
 
+    .editorial-post-thumb.is-contain {
+      padding: 3px 4px;
+    }
+
     .editorial-post-title {
       margin: 2px 0 0;
       font-family: var(--font-serif-display);
@@ -1698,6 +1702,10 @@
       transform: scale(1.04);
     }
 
+    .archive-card-cover.is-contain {
+      padding: 6px 10px;
+    }
+
     /* ==================== READER VIEW ==================== */
     .reader-toolbar {
       display: flex;
@@ -1831,6 +1839,22 @@
     }
 
     .reader-artwork-wrap:hover img {
+      transform: scale(1.02);
+    }
+
+    .reader-artwork-wrap.is-contain {
+      padding: 8px 12px;
+    }
+
+    .archive-card-cover.is-contain img,
+    .editorial-post-thumb.is-contain img,
+    .reader-artwork-wrap.is-contain img {
+      object-fit: contain;
+      object-position: 50% 50%;
+    }
+
+    .archive-card:hover .archive-card-cover.is-contain img,
+    .editorial-post-row:hover .editorial-post-thumb.is-contain img {
       transform: scale(1.02);
     }
 
@@ -2839,7 +2863,7 @@
                 <button type="button" data-cat="essays" class="home-cat-btn capsule-seg-item">设计与随笔</button>
               </div>
               <button type="button" id="hero-fable-preview-btn" class="editorial-pill-btn editorial-pill-secondary hero-fable-preview-btn" aria-label="展开查看卷首纸面画卷">
-                <span aria-hidden="true">✦</span>
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex-shrink: 0;"><path d="M12 3l2.2 6.8L21 12l-6.8 2.2L12 21l-2.2-6.8L3 12l6.8-2.2L12 3z" /></svg>
                 <span>卷首画卷 · 展开</span>
               </button>
             </div>
@@ -3178,7 +3202,7 @@
         <div class="eyebrow">Typography</div>
         <div style="font-size: 15.5px; font-weight: 600; margin-top: 2px;">阅读外观与排版偏好</div>
       </div>
-      <button type="button" id="close-customizer-btn" class="editorial-circle-action" aria-label="关闭面板">✕</button>
+      <button type="button" id="close-customizer-btn" class="editorial-circle-action" aria-label="关闭面板"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6L6 18M6 6l12 12" /></svg></button>
     </div>
 
     <div class="drawer-group">
@@ -3276,7 +3300,7 @@
           <div id="lightbox-eyebrow" class="eyebrow">VISUAL CORNER · 光影画匣</div>
           <h3 id="lightbox-title" class="artwork-lightbox-title">插画预览</h3>
         </div>
-        <button type="button" id="close-lightbox-btn" class="editorial-circle-action" aria-label="关闭大图预览">✕</button>
+        <button type="button" id="close-lightbox-btn" class="editorial-circle-action" aria-label="关闭大图预览"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6L6 18M6 6l12 12" /></svg></button>
       </div>
       <div class="artwork-lightbox-media">
         <img id="lightbox-img" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" alt="" />
@@ -3460,6 +3484,68 @@
       function stripHtml(html) {
         const noTags = String(html || '').replace(/<[^>]+>/g, ' ');
         return decodeHtmlEntities(noTags).replace(/\s+/g, ' ').trim();
+      }
+
+      function withInstantScroll(fn) {
+        const root = document.documentElement;
+        const prevBehavior = root.style.scrollBehavior;
+        root.style.scrollBehavior = 'auto';
+        try {
+          fn();
+        } finally {
+          root.style.scrollBehavior = prevBehavior;
+        }
+      }
+
+      function scrollToTopInstant() {
+        withInstantScroll(function () {
+          try {
+            window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+          } catch (err) {
+            window.scrollTo(0, 0);
+          }
+        });
+      }
+
+      function scrollElementInstant(el) {
+        if (!el) return;
+        withInstantScroll(function () {
+          try {
+            el.scrollIntoView({ behavior: 'instant', block: 'start' });
+          } catch (err) {
+            el.scrollIntoView(true);
+          }
+        });
+      }
+
+      function scrollToTopForPreference() {
+        if (state.prefs.motionLevel === 'none') {
+          scrollToTopInstant();
+        } else {
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+      }
+
+      function findHashTarget(rawHash) {
+        if (!rawHash || typeof rawHash !== 'string' || rawHash === '#') return null;
+        const rawId = rawHash.charAt(0) === '#' ? rawHash.slice(1) : rawHash;
+        if (!rawId) return null;
+        let decoded = rawId;
+        try {
+          decoded = decodeURIComponent(rawId);
+        } catch (err) {
+          decoded = rawId;
+        }
+        return document.getElementById(decoded) || document.getElementById(rawId);
+      }
+
+      function coverContainerAttrs(baseClass, post) {
+        const isContain = Boolean(post && post.coverFit === 'contain');
+        const cls = baseClass + (isContain ? ' is-contain' : '');
+        const bg = post && typeof post.coverBg === 'string' && /^#[0-9a-fA-F]{6}$/.test(post.coverBg)
+          ? ' style="background-color: ' + post.coverBg + ';"'
+          : '';
+        return 'class="' + cls + '"' + bg;
       }
 
       function renderKeyTakeawayHtml(post) {
@@ -3695,7 +3781,7 @@
               '</div>' +
               '<div class="editorial-post-aside">' +
                 (post.cover
-                  ? '<div class="editorial-post-thumb">' +
+                  ? '<div ' + coverContainerAttrs('editorial-post-thumb', post) + '>' +
                       '<img src="' + post.cover + '" alt="' + escapeHtml(post.title) + '" loading="lazy" />' +
                     '</div>'
                   : '') +
@@ -3803,7 +3889,7 @@
             '<article data-read-card="' + escapeHtml(post.id) + '" class="bento-tile bento-interactive bento-sheen archive-card">' +
               '<div style="display: flex; flex-direction: column; gap: 12px; position: relative; z-index: 2;">' +
                 (post.cover
-                  ? '<div class="archive-card-cover">' +
+                  ? '<div ' + coverContainerAttrs('archive-card-cover', post) + '>' +
                       '<img src="' + post.cover + '" alt="' + escapeHtml(post.title) + '" loading="lazy" />' +
                     '</div>'
                   : '') +
@@ -3836,7 +3922,7 @@
         const mode = state.prefs.headMode;
         if (mode === 'artwork' && post.cover) {
           frameEl.innerHTML =
-            '<button type="button" class="reader-artwork-wrap" data-open-reader-artwork="true" aria-label="放大查看文章主题插画">' +
+            '<button type="button" ' + coverContainerAttrs('reader-artwork-wrap', post) + ' data-open-reader-artwork="true" aria-label="放大查看文章主题插画">' +
               '<img src="' + post.cover + '" alt="' + escapeHtml(post.title) + '" />' +
             '</button>';
         } else if (mode === 'none' || !post.specimen) {
@@ -3999,7 +4085,7 @@
         if (!options.fromHistory) syncUrl(nextView, Boolean(options.initial));
 
         if (!options.keepScroll) {
-          window.scrollTo({ top: 0, behavior: state.prefs.motionLevel === 'none' ? 'auto' : 'smooth' });
+          scrollToTopInstant();
         }
         updateScrollProgressAndTOC();
       }
@@ -4183,7 +4269,7 @@
       function syncUrl(view, replace) {
         if (!ROUTING_ENABLED) return;
         const path = pathForView(view);
-        if (!replace && location.pathname === path) return;
+        if (!replace && location.pathname === path && !location.hash) return;
         try {
           const entry = { view: view, postId: state.activePostId };
           if (replace) {
@@ -4433,7 +4519,7 @@
           switchView('blog');
         });
         document.getElementById('footer-scroll-top').addEventListener('click', function () {
-          window.scrollTo({ top: 0, behavior: state.prefs.motionLevel === 'none' ? 'auto' : 'smooth' });
+          scrollToTopForPreference();
         });
         document.getElementById('mobile-menu-btn').addEventListener('click', function () {
           state.mobileMenuOpen = !state.mobileMenuOpen;
@@ -4496,7 +4582,7 @@
           }
         });
         document.getElementById('toc-scroll-top').addEventListener('click', function () {
-          window.scrollTo({ top: 0, behavior: state.prefs.motionLevel === 'none' ? 'auto' : 'smooth' });
+          scrollToTopForPreference();
         });
 
         document.getElementById('reader-back-blog-btn').addEventListener('click', function () {
@@ -4547,7 +4633,7 @@
           openArtworkLightbox({
             eyebrow: 'ARCHIVAL HERO PLATE · 卷首纸面画卷',
             title: '研究、观察与档案纸页',
-            sub: '围绕中心留白的博物学边缘叙事：橄榄枝、星盘弧线、暖色纸蛾与钢笔笔记，融入三套主题纸面肌理。',
+            sub: '围绕中心留白的博物学边缘叙事：橄榄枝、星盘弧线、暖色纸蛾与钢笔笔记，融入两套主题纸面肌理。',
             src: IMAGES.fableHeroCanvas
           });
         });
@@ -4760,7 +4846,31 @@
         document.addEventListener('visibilitychange', syncParticlesState);
         window.addEventListener('popstate', function () {
           if (!ROUTING_ENABLED) return;
-          applyRoute(parseRoute(location.pathname), { fromHistory: true });
+          const route = parseRoute(location.pathname);
+          const sameRoute = route.view === state.activeView && (route.view !== 'reader' || route.postId === state.activePostId);
+          if (sameRoute) {
+            const target = findHashTarget(location.hash);
+            if (target) {
+              if (state.prefs.motionLevel === 'none') {
+                scrollElementInstant(target);
+              } else {
+                target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+              }
+            }
+            updateScrollProgressAndTOC();
+            return;
+          }
+          const hasHash = Boolean(location.hash && location.hash.length > 1);
+          applyRoute(route, { fromHistory: true, keepScroll: hasHash });
+          if (hasHash) {
+            const target = findHashTarget(location.hash);
+            if (target) {
+              scrollElementInstant(target);
+            } else {
+              scrollToTopInstant();
+            }
+          }
+          updateScrollProgressAndTOC();
         });
         window.addEventListener('scroll', updateScrollProgressAndTOC, { passive: true });
         window.addEventListener('resize', function () {
@@ -4775,6 +4885,13 @@
         bindEvents();
         applyPrefsToDOM();
         applyRoute(ROUTING_ENABLED ? parseRoute(location.pathname) : { view: 'home' }, { keepScroll: true, initial: true });
+        if (ROUTING_ENABLED && location.hash && location.hash.length > 1) {
+          const target = findHashTarget(location.hash);
+          if (target) {
+            scrollElementInstant(target);
+            updateScrollProgressAndTOC();
+          }
+        }
         resizeHeroCanvas();
         syncParticlesState();
       });

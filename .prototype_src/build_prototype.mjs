@@ -93,6 +93,12 @@ function evaluateData(imagesCode, articlesCode) {
     if (post.updated && !/^\d{4}-\d{2}-\d{2}$/.test(post.updated)) {
       throw new Error(`Bad updated date for ${post.id}: ${post.updated}`);
     }
+    if (post.coverFit !== undefined && post.coverFit !== 'cover' && post.coverFit !== 'contain') {
+      throw new Error(`Bad coverFit for ${post.id}: ${JSON.stringify(post.coverFit)}`);
+    }
+    if (post.coverBg !== undefined && (typeof post.coverBg !== 'string' || !/^#[0-9a-fA-F]{6}$/.test(post.coverBg))) {
+      throw new Error(`Bad coverBg for ${post.id}: ${JSON.stringify(post.coverBg)}`);
+    }
     const slug = postSlug(post.id);
     if (!/^[a-z0-9-]+$/.test(slug)) throw new Error(`Post slug must be [a-z0-9-]: ${slug}`);
     if (seenSlugs.has(slug)) throw new Error(`Duplicate post slug: ${slug}`);
@@ -313,11 +319,18 @@ function validateGeneratedHtml(html, label, { expectInlineImages }) {
     '左文右标本对照流',
     '画作归呼吸，短记归日常',
     '独立承载二次元光影',
+    '三套主题',
   ];
   for (const forbidden of forbiddenTokens) {
     if (html.includes(forbidden)) {
       throw new Error(`[${label}] Found forbidden copy token in generated HTML: ${forbidden}`);
     }
+  }
+
+  const dingbatsMatch = html.match(/[\u2715\u2726]/);
+  if (dingbatsMatch !== null) {
+    const codePoint = dingbatsMatch[0].codePointAt(0).toString(16).toUpperCase();
+    throw new Error(`[${label}] Found Dingbats character with missing-glyph risk: U+${codePoint}`);
   }
 
   const strayAppleMatch = html.replace(/-apple-system/g, '').match(/apple/i);
