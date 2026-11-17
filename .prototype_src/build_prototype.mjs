@@ -358,6 +358,17 @@ function validateGeneratedHtml(html, label, { expectInlineImages }) {
     }
   }
 
+  for (const token of ['drawer-head', 'drawer-body', 'drawer-foot', 'scrollRestoration', 'is-theme-switching']) {
+    if (!html.includes(token)) {
+      throw new Error(`[${label}] Missing regression token: ${token}`);
+    }
+  }
+
+  const rssLinkCount = (html.match(/<a\b[^>]*\bdata-rss-link\b/g) || []).length;
+  if (rssLinkCount < 2) {
+    throw new Error(`[${label}] Expected at least 2 <a data-rss-link> elements, found ${rssLinkCount}`);
+  }
+
   const hasInlineJpeg = /data:image\/(jpe?g|png|webp);base64,/.test(html);
   if (expectInlineImages && !hasInlineJpeg) {
     throw new Error(`[${label}] Expected inline images in self-contained preview`);

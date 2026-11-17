@@ -117,6 +117,25 @@
       scroll-behavior: auto !important;
     }
 
+    html.is-theme-switching,
+    html.is-theme-switching *,
+    html.is-theme-switching *::before,
+    html.is-theme-switching *::after {
+      transition: none !important;
+    }
+
+    ::view-transition-old(root),
+    ::view-transition-new(root) {
+      animation-duration: 220ms;
+      animation-timing-function: cubic-bezier(0.32, 0.72, 0, 1);
+      mix-blend-mode: normal;
+    }
+
+    html.is-theme-vt-subtle::view-transition-old(root),
+    html.is-theme-vt-subtle::view-transition-new(root) {
+      animation-duration: 150ms;
+    }
+
     *,
     *::before,
     *::after {
@@ -696,17 +715,24 @@
     }
 
     .profile-actions-row {
-      display: flex;
-      justify-content: center;
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px;
     }
 
     .profile-action-link {
       width: 100%;
-      padding: 7px 12px;
+      min-width: 0;
+      padding: 7px 8px;
+      gap: 5px;
       font-size: 12px;
       text-decoration: none;
       white-space: nowrap;
       justify-content: center;
+    }
+
+    .profile-action-link svg {
+      flex-shrink: 0;
     }
 
     .profile-action-link:hover {
@@ -2308,25 +2334,51 @@
       z-index: 70;
       width: calc(100% - 24px);
       max-width: 376px;
+      max-height: calc(100dvh - 24px);
       border-radius: 26px;
       background: var(--bg-sheet);
       backdrop-filter: saturate(180%) blur(28px);
       -webkit-backdrop-filter: saturate(180%) blur(28px);
       border: 1px solid var(--hairline-strong);
       box-shadow: 0 24px 60px rgba(0, 0, 0, 0.24);
-      padding: 22px;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .drawer-head {
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 18px 22px 14px;
+      border-bottom: 1px solid var(--hairline);
+    }
+
+    .drawer-body {
+      flex: 1 1 auto;
+      min-height: 0;
       overflow-y: auto;
+      overscroll-behavior: contain;
+      -webkit-overflow-scrolling: touch;
+      padding: 18px 22px;
       display: flex;
       flex-direction: column;
       gap: 20px;
     }
 
-    .drawer-head {
+    .drawer-body .capsule-seg-item {
+      padding-left: 8px;
+      padding-right: 8px;
+      white-space: nowrap;
+    }
+
+    .drawer-foot {
+      flex-shrink: 0;
       display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding-bottom: 12px;
-      border-bottom: 1px solid var(--hairline);
+      gap: 8px;
+      padding: 14px 22px 18px;
+      border-top: 1px solid var(--hairline);
     }
 
     .drawer-group {
@@ -2564,10 +2616,17 @@
     .footer-links {
       display: flex;
       align-items: center;
+      flex-wrap: wrap;
       gap: 16px;
     }
 
-    .footer-links button:hover {
+    .footer-links a {
+      color: inherit;
+      text-decoration: none;
+    }
+
+    .footer-links button:hover,
+    .footer-links a:hover {
       color: var(--text-primary);
       text-decoration: underline;
     }
@@ -2952,10 +3011,26 @@
                 href="https://github.com/CaramelizedCUDA"
                 target="_blank"
                 rel="noopener noreferrer"
+                title="GitHub · @CaramelizedCUDA"
                 class="editorial-pill-btn editorial-pill-secondary profile-action-link"
               >
-                <span>GitHub · @CaramelizedCUDA</span>
+                <span>GitHub</span>
                 <span aria-hidden="true">↗</span>
+              </a>
+              <a
+                data-rss-link
+                href="/rss.xml"
+                target="_blank"
+                rel="noopener noreferrer"
+                title="RSS 订阅"
+                class="editorial-pill-btn editorial-pill-secondary profile-action-link"
+              >
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <path d="M4 11a9 9 0 0 1 9 9" />
+                  <path d="M4 4a16 16 0 0 1 16 16" />
+                  <circle cx="5" cy="19" r="1.5" fill="currentColor" stroke="none" />
+                </svg>
+                <span>RSS 订阅</span>
               </a>
             </div>
           </div>
@@ -3204,6 +3279,7 @@
       <button type="button" id="footer-go-home">首页</button>
       <button type="button" id="footer-go-blog">文章归档</button>
       <button type="button" id="footer-scroll-top">回到顶部</button>
+      <a data-rss-link href="/rss.xml" target="_blank" rel="noopener noreferrer">RSS 订阅</a>
     </div>
   </footer>
 
@@ -3218,6 +3294,7 @@
       <button type="button" id="close-customizer-btn" class="editorial-circle-action" aria-label="关闭面板"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6L6 18M6 6l12 12" /></svg></button>
     </div>
 
+    <div id="customizer-drawer-body" class="drawer-body">
     <div class="drawer-group">
       <span class="eyebrow">底纸主题</span>
       <div class="drawer-grid-2">
@@ -3297,8 +3374,9 @@
       <div class="eyebrow">排版预览</div>
       <p class="drawer-preview-text">问题不在 <code>ENOENT</code> 是否存在，而在 <code>existsSync()</code> 把 <code>D:\AI-Dev\devin</code> 目录当成了可执行文件。</p>
     </div>
+    </div>
 
-    <div style="display: flex; gap: 8px; padding-top: 2px;">
+    <div class="drawer-foot">
       <button type="button" id="drawer-jump-reader-btn" class="editorial-pill-btn editorial-pill-primary" style="flex: 1; padding: 9px 14px;">完成设置</button>
       <button type="button" id="drawer-reset-prefs-btn" class="editorial-pill-btn editorial-pill-secondary">恢复推荐</button>
     </div>
@@ -5083,6 +5161,109 @@ debug = 1</code></pre>
         syncParticlesState();
       }
 
+      let activeThemeTransition = null;
+      let themeTransitionToken = 0;
+      let themeFallbackRaf1 = 0;
+      let themeFallbackRaf2 = 0;
+
+      function cancelThemeFallbackCleanup() {
+        if (themeFallbackRaf1 && typeof cancelAnimationFrame === 'function') {
+          cancelAnimationFrame(themeFallbackRaf1);
+        }
+        if (themeFallbackRaf2 && typeof cancelAnimationFrame === 'function') {
+          cancelAnimationFrame(themeFallbackRaf2);
+        }
+        themeFallbackRaf1 = 0;
+        themeFallbackRaf2 = 0;
+      }
+
+      function applyThemeTransition(mutateFn) {
+        const root = document.documentElement;
+        const token = ++themeTransitionToken;
+        cancelThemeFallbackCleanup();
+
+        if (activeThemeTransition) {
+          try {
+            activeThemeTransition.skipTransition();
+          } catch (err) {
+            // Ignore if previous transition already finished or skipped
+          }
+          activeThemeTransition = null;
+        }
+
+        const reducedMotion =
+          typeof window.matchMedia === 'function' &&
+          window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        const useFallback =
+          state.prefs.motionLevel === 'none' ||
+          document.body.getAttribute('data-motion') === 'none' ||
+          reducedMotion ||
+          document.hidden ||
+          typeof document.startViewTransition !== 'function';
+
+        const scheduleFallbackCleanup = function () {
+          if (typeof requestAnimationFrame === 'function') {
+            themeFallbackRaf1 = requestAnimationFrame(function () {
+              themeFallbackRaf1 = 0;
+              if (token !== themeTransitionToken) return;
+              themeFallbackRaf2 = requestAnimationFrame(function () {
+                themeFallbackRaf2 = 0;
+                if (token !== themeTransitionToken) return;
+                root.classList.remove('is-theme-switching');
+              });
+            });
+          } else {
+            root.classList.remove('is-theme-switching');
+          }
+        };
+
+        if (useFallback) {
+          root.classList.remove('is-theme-vt-subtle');
+          root.classList.add('is-theme-switching');
+          mutateFn();
+          void root.offsetHeight;
+          scheduleFallbackCleanup();
+          return;
+        }
+
+        root.classList.toggle('is-theme-vt-subtle', state.prefs.motionLevel === 'subtle');
+        let vt;
+        try {
+          vt = document.startViewTransition(function () {
+            root.classList.add('is-theme-switching');
+            mutateFn();
+            void root.offsetHeight;
+          });
+        } catch (err) {
+          root.classList.remove('is-theme-vt-subtle');
+          root.classList.add('is-theme-switching');
+          mutateFn();
+          void root.offsetHeight;
+          scheduleFallbackCleanup();
+          return;
+        }
+
+        activeThemeTransition = vt;
+        if (vt && vt.ready && typeof vt.ready.catch === 'function') {
+          vt.ready.catch(function () {});
+        }
+        if (vt && vt.updateCallbackDone && typeof vt.updateCallbackDone.catch === 'function') {
+          vt.updateCallbackDone.catch(function () {});
+        }
+        const finalize = function () {
+          if (activeThemeTransition === vt) activeThemeTransition = null;
+          if (token === themeTransitionToken) {
+            root.classList.remove('is-theme-switching');
+            root.classList.remove('is-theme-vt-subtle');
+          }
+        };
+        if (vt && vt.finished && typeof vt.finished.then === 'function') {
+          vt.finished.then(finalize, finalize);
+        } else {
+          finalize();
+        }
+      }
+
       function renderHomeView() {
         document.getElementById('nav-post-count').textContent = String(BLOG_POSTS.length);
         const profilePostCount = document.getElementById('profile-post-count');
@@ -5480,15 +5661,22 @@ debug = 1</code></pre>
           toggleCustomizer(false);
         }
 
+        if (!options.keepScroll) {
+          scrollToTopInstant();
+        }
+
         if (nextView === 'home') renderHomeView();
         if (nextView === 'blog') renderArchiveView();
         if (nextView === 'reader') renderReaderView();
 
         syncParticlesState();
         syncHeadMeta(nextView, options);
+        if (!options.keepScroll) {
+          scrollToTopInstant();
+        }
         if (!options.fromHistory) syncUrl(nextView, Boolean(options.initial));
 
-        if (!options.keepScroll) {
+        if (!options.keepScroll && (window.scrollY || document.documentElement.scrollTop || 0) !== 0) {
           scrollToTopInstant();
         }
         updateScrollProgressAndTOC();
@@ -5513,6 +5701,13 @@ debug = 1</code></pre>
         return DEFAULT_SITE_ORIGIN;
       })();
       const ROUTING_ENABLED = location.protocol === 'http:' || location.protocol === 'https:';
+      if (ROUTING_ENABLED && typeof history !== 'undefined' && 'scrollRestoration' in history) {
+        try {
+          history.scrollRestoration = 'manual';
+        } catch (err) {
+          // Safe fallback when scrollRestoration is not writable
+        }
+      }
 
       function postSlug(postId) {
         return String(postId).replace(/^post-/, '');
@@ -5721,6 +5916,15 @@ debug = 1</code></pre>
         if (companionImg && IMAGES.companionNightOwl) companionImg.src = IMAGES.companionNightOwl;
         const micrologImg = document.getElementById('microlog-avatar-img');
         if (micrologImg && IMAGES.avatarCaramel) micrologImg.src = IMAGES.avatarCaramel;
+      }
+
+      function initRssLinks() {
+        const rssHeadLink = document.querySelector('link[rel="alternate"][type="application/rss+xml"]');
+        const rssHref = rssHeadLink && rssHeadLink.getAttribute('href');
+        if (!rssHref) return;
+        document.querySelectorAll('[data-rss-link]').forEach(function (el) {
+          el.setAttribute('href', rssHref);
+        });
       }
 
       function setLightboxBackgroundInert(isInert) {
@@ -5934,8 +6138,10 @@ debug = 1</code></pre>
           const order = ['warm', 'night'];
           const next = order[(order.indexOf(state.prefs.theme) + 1) % order.length];
           state.prefs.theme = next;
-          applyPrefsToDOM();
-          savePrefs();
+          applyThemeTransition(function () {
+            applyPrefsToDOM();
+            savePrefs();
+          });
           showToast('底纸已切换至「' + THEME_META[next].label + '」');
         });
 
@@ -5952,13 +6158,21 @@ debug = 1</code></pre>
           toggleCustomizer(false);
         });
         document.getElementById('drawer-reset-prefs-btn').addEventListener('click', function () {
+          const themeChanged = state.prefs.theme !== DEFAULT_PREFS.theme;
           state.prefs = Object.assign({}, DEFAULT_PREFS);
-          applyPrefsToDOM();
-          if (state.activeView === 'reader') {
-            const p = BLOG_POSTS.find(function (x) { return x.id === state.activePostId; }) || BLOG_POSTS[0];
-            if (p) renderReaderHeadFrame(p);
+          const applyReset = function () {
+            applyPrefsToDOM();
+            if (state.activeView === 'reader') {
+              const p = BLOG_POSTS.find(function (x) { return x.id === state.activePostId; }) || BLOG_POSTS[0];
+              if (p) renderReaderHeadFrame(p);
+            }
+            savePrefs();
+          };
+          if (themeChanged) {
+            applyThemeTransition(applyReset);
+          } else {
+            applyReset();
           }
-          savePrefs();
           showToast('已恢复推荐排版与底纸');
         });
 
@@ -6181,9 +6395,13 @@ debug = 1</code></pre>
 
             const drawerTheme = btn.getAttribute('data-drawer-theme');
             if (drawerTheme && THEME_META[drawerTheme]) {
-              state.prefs.theme = drawerTheme;
-              applyPrefsToDOM();
-              savePrefs();
+              if (state.prefs.theme !== drawerTheme) {
+                state.prefs.theme = drawerTheme;
+                applyThemeTransition(function () {
+                  applyPrefsToDOM();
+                  savePrefs();
+                });
+              }
               return;
             }
 
@@ -6252,19 +6470,23 @@ debug = 1</code></pre>
           if (!ROUTING_ENABLED) return;
           const route = parseRoute(location.pathname);
           const sameRoute = route.view === state.activeView && (route.view !== 'reader' || route.postId === state.activePostId);
+          const hasHash = Boolean(location.hash && location.hash.length > 1);
           if (sameRoute) {
-            const target = findHashTarget(location.hash);
-            if (target) {
-              if (state.prefs.motionLevel === 'none') {
-                scrollElementInstant(target);
-              } else {
-                target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            if (hasHash) {
+              const target = findHashTarget(location.hash);
+              if (target) {
+                if (state.prefs.motionLevel === 'none') {
+                  scrollElementInstant(target);
+                } else {
+                  target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }
               }
+            } else {
+              scrollToTopInstant();
             }
             updateScrollProgressAndTOC();
             return;
           }
-          const hasHash = Boolean(location.hash && location.hash.length > 1);
           applyRoute(route, { fromHistory: true, keepScroll: hasHash });
           if (hasHash) {
             const target = findHashTarget(location.hash);
@@ -6272,6 +6494,19 @@ debug = 1</code></pre>
               scrollElementInstant(target);
             } else {
               scrollToTopInstant();
+            }
+          } else {
+            scrollToTopInstant();
+            if (typeof requestAnimationFrame === 'function') {
+              requestAnimationFrame(function () {
+                const currentHasHash = Boolean(location.hash && location.hash.length > 1);
+                const sameCurrentRoute =
+                  state.activeView === route.view && (route.view !== 'reader' || state.activePostId === route.postId);
+                if (sameCurrentRoute && !currentHasHash && (window.scrollY || document.documentElement.scrollTop || 0) !== 0) {
+                  scrollToTopInstant();
+                  updateScrollProgressAndTOC();
+                }
+              });
             }
           }
           updateScrollProgressAndTOC();
@@ -6286,6 +6521,7 @@ debug = 1</code></pre>
       window.addEventListener('DOMContentLoaded', function () {
         loadSavedState();
         initStaticImages();
+        initRssLinks();
         bindEvents();
         applyPrefsToDOM();
         applyRoute(ROUTING_ENABLED ? parseRoute(location.pathname) : { view: 'home' }, { keepScroll: true, initial: true });
