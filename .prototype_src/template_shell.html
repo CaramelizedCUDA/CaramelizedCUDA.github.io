@@ -1408,16 +1408,26 @@
     /* Act 4: Visual Interlude & Micro Log */
     .act-interlude-grid {
       display: grid;
-      grid-template-columns: minmax(0, 1.28fr) minmax(0, 0.92fr);
+      grid-template-columns: minmax(0, 1.12fr) minmax(0, 1fr);
       gap: 22px;
-      align-items: stretch;
+      align-items: start;
+    }
+
+    .interlude-sticky-col {
+      position: sticky;
+      top: 86px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      min-width: 0;
     }
 
     .interlude-card {
       position: relative;
       border-radius: 26px;
       overflow: hidden;
-      min-height: 330px;
+      aspect-ratio: 16 / 9.6;
+      min-height: 290px;
       background: #141312;
       border: 1px solid var(--hairline);
       box-shadow: var(--card-shadow);
@@ -1425,6 +1435,16 @@
       flex-direction: column;
       justify-content: space-between;
       padding: 20px 22px;
+    }
+
+    .interlude-companion-card {
+      padding: 15px 18px;
+      border-radius: 22px;
+      background: var(--bg-surface);
+    }
+
+    [data-theme="night"] .interlude-companion-card {
+      background: var(--bg-surface);
     }
 
     .interlude-img {
@@ -1561,8 +1581,22 @@
       padding: 24px 26px;
       display: flex;
       flex-direction: column;
-      justify-content: space-between;
+      justify-content: flex-start;
       gap: 16px;
+      scroll-margin-top: 86px;
+    }
+
+    .microlog-footer {
+      padding-top: 12px;
+      border-top: 1px solid var(--hairline);
+      display: flex;
+      justify-content: center;
+    }
+
+    .microlog-toggle-btn {
+      width: 100%;
+      justify-content: center;
+      font-size: 12.5px;
     }
 
     .microlog-header-id {
@@ -2246,6 +2280,43 @@
       color: #ffffff;
     }
 
+    /* Inline Prose Figures (Screenshots & Diagrams) */
+    .blog-prose-container .prose-figure {
+      margin: 1.75em 0;
+      border-radius: 18px;
+      overflow: hidden;
+      background: var(--bg-surface-secondary);
+      border: 1px solid var(--hairline-strong);
+      box-shadow: var(--card-shadow);
+    }
+
+    .blog-prose-container .prose-figure img {
+      display: block;
+      width: auto;
+      max-width: 100%;
+      max-height: 580px;
+      height: auto;
+      margin: 0 auto;
+    }
+
+    .blog-prose-container .prose-figure img[data-prose-zoom] {
+      cursor: zoom-in;
+    }
+
+    .blog-prose-container .prose-figure img[data-prose-zoom]:focus-visible {
+      outline: 2px solid var(--accent-primary);
+      outline-offset: -2px;
+    }
+
+    .blog-prose-container .prose-figure figcaption {
+      padding: 0.68rem 1.05rem;
+      border-top: 1px solid var(--hairline);
+      font-size: 0.82em;
+      line-height: 1.55;
+      color: var(--text-muted);
+      text-align: center;
+    }
+
     /* Fact-Check Footnote & Prev/Next */
     .reader-footnote-card {
       max-width: var(--reader-max-width);
@@ -2678,7 +2749,17 @@
       }
     }
 
+    @media (max-height: 620px) {
+      .interlude-sticky-col {
+        position: static;
+      }
+    }
+
     @media (max-width: 980px) {
+      .interlude-sticky-col {
+        position: static;
+      }
+
       .act-masthead,
       .lead-monograph-card,
       .editorial-post-row,
@@ -2852,7 +2933,7 @@
         <button type="button" data-nav="home" class="nav-tab capsule-seg-item">首页</button>
         <button type="button" data-nav="blog" class="nav-tab capsule-seg-item">
           <span>文章归档</span>
-          <span id="nav-post-count" class="nav-count-badge">5</span>
+          <span id="nav-post-count" class="nav-count-badge">7</span>
         </button>
         <button type="button" data-nav="reader" class="nav-tab capsule-seg-item">阅读</button>
       </nav>
@@ -2991,7 +3072,7 @@
 
           <div class="profile-footer">
             <div class="profile-stats-line">
-              <span id="profile-post-count">5</span> 篇长文 · <span id="profile-note-count">7</span> 则短记
+              <span id="profile-post-count">7</span> 篇长文 · <span id="profile-note-count">8</span> 则短记
             </div>
             <div class="profile-actions-row">
               <a
@@ -3050,39 +3131,57 @@
           <h2 class="section-title">光影与短记</h2>
         </div>
         <div class="act-interlude-grid">
-          <div class="interlude-card">
-            <img
-              id="interlude-banner-img"
-              src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"
-              alt="案头光影插画"
-              class="interlude-img"
-            />
-            <div class="interlude-scrim"></div>
-            <canvas id="hero-particles" aria-hidden="true"></canvas>
+          <div class="interlude-sticky-col">
+            <div class="interlude-card">
+              <img
+                id="interlude-banner-img"
+                src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"
+                alt="案头光影插画"
+                class="interlude-img"
+              />
+              <div class="interlude-scrim"></div>
+              <canvas id="hero-particles" aria-hidden="true"></canvas>
 
-            <div class="interlude-top">
-              <span class="interlude-badge">
-                <span class="theme-dot" aria-hidden="true"></span>
-                <span>VISUAL CORNER · 光影画匣</span>
-              </span>
-              <button type="button" id="interlude-zoom-btn" class="interlude-zoom-btn" aria-label="查看大图预览">
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-                  <path stroke-linecap="round" stroke-linejoin="round" d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7" />
-                </svg>
-                <span>查看原画</span>
-              </button>
+              <div class="interlude-top">
+                <span class="interlude-badge">
+                  <span class="theme-dot" aria-hidden="true"></span>
+                  <span>VISUAL CORNER · 光影画匣</span>
+                </span>
+                <button type="button" id="interlude-zoom-btn" class="interlude-zoom-btn" aria-label="查看大图预览">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7" />
+                  </svg>
+                  <span>查看原画</span>
+                </button>
+              </div>
+
+              <div class="interlude-bottom">
+                <div>
+                  <h3 id="interlude-title" class="interlude-caption-title">海列车的午后</h3>
+                  <p id="interlude-sub" class="interlude-caption-sub">窗外掠过晴空与海面，手边是一杯热咖啡与摊开的笔记。</p>
+                </div>
+                <div class="interlude-tabs" role="group" aria-label="切换画幅">
+                  <button type="button" data-interlude="windowStudy" class="interlude-tab-btn is-active">海列车的午后</button>
+                  <button type="button" data-interlude="starryRipple" class="interlude-tab-btn">星海微澜</button>
+                  <button type="button" data-interlude="sunlitStreet" class="interlude-tab-btn">晴街绣球</button>
+                  <button type="button" data-interlude="lanternReading" class="interlude-tab-btn">暖灯夜读</button>
+                </div>
+              </div>
             </div>
 
-            <div class="interlude-bottom">
-              <div>
-                <h3 id="interlude-title" class="interlude-caption-title">海列车的午后</h3>
-                <p id="interlude-sub" class="interlude-caption-sub">窗外掠过晴空与海面，手边是一杯热咖啡与摊开的笔记。</p>
-              </div>
-              <div class="interlude-tabs" role="group" aria-label="切换画幅">
-                <button type="button" data-interlude="windowStudy" class="interlude-tab-btn is-active">海列车的午后</button>
-                <button type="button" data-interlude="starryRipple" class="interlude-tab-btn">星海微澜</button>
-                <button type="button" data-interlude="sunlitStreet" class="interlude-tab-btn">晴街绣球</button>
-                <button type="button" data-interlude="lanternReading" class="interlude-tab-btn">暖灯夜读</button>
+            <div class="bento-tile masthead-companion interlude-companion-card">
+              <button type="button" id="masthead-companion-trigger" class="masthead-companion-thumb-btn" aria-label="放大查看夜猫子案头插画">
+                <img
+                  id="masthead-companion-img"
+                  src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"
+                  alt="夜猫子案头插画"
+                  class="masthead-companion-img"
+                />
+              </button>
+              <div class="masthead-companion-copy">
+                <div class="eyebrow" style="color: var(--accent-primary);">NIGHT OWL NOTES · 深夜案头</div>
+                <div class="masthead-companion-title">案头拾零与夜读时间</div>
+                <div class="masthead-companion-sub">白日研究系统与工具链，深夜随手记下案头的吉光片羽。</div>
               </div>
             </div>
           </div>
@@ -3098,24 +3197,12 @@
                 />
                 <span class="eyebrow">NOTES · 案头短记</span>
               </div>
-              <span class="mono" style="font-size: 11px; color: var(--text-muted);">2026</span>
-            </div>
-            <div class="masthead-companion">
-              <button type="button" id="masthead-companion-trigger" class="masthead-companion-thumb-btn" aria-label="放大查看夜猫子案头插画">
-                <img
-                  id="masthead-companion-img"
-                  src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"
-                  alt="夜猫子案头插画"
-                  class="masthead-companion-img"
-                />
-              </button>
-              <div class="masthead-companion-copy">
-                <div class="eyebrow" style="color: var(--accent-primary);">NIGHT OWL NOTES · 深夜案头</div>
-                <div class="masthead-companion-title">案头拾零与夜读时间</div>
-                <div class="masthead-companion-sub">白日研究系统与工具链，深夜随手记下案头的吉光片羽。</div>
-              </div>
+              <span id="microlog-total-meta" class="mono" style="font-size: 11px; color: var(--text-secondary);">共 8 则 · 2026</span>
             </div>
             <div id="home-microlog-list" class="microlog-list"></div>
+            <div id="home-microlog-footer" class="microlog-footer hidden">
+              <button type="button" id="toggle-micrologs-btn" data-toggle-micrologs="1" aria-expanded="false" aria-controls="home-microlog-list" class="editorial-pill-btn editorial-pill-secondary microlog-toggle-btn">展开更早短记</button>
+            </div>
           </aside>
         </div>
       </div>
@@ -3476,6 +3563,7 @@
         customizerOpen: false,
         lightboxOpen: false,
         lightboxTriggerEl: null,
+        micrologsExpanded: false,
         mobileMenuOpen: false,
         mobileTocOpen: false,
         activeHeadings: [],
@@ -3992,10 +4080,18 @@
         });
       }
 
+      const MICROLOG_COLLAPSED_COUNT = 4;
+
       function renderMicroLogs() {
         const listEl = document.getElementById('home-microlog-list');
         if (!listEl) return;
-        listEl.innerHTML = MICRO_LOGS.map(function (item) {
+        const totalMeta = document.getElementById('microlog-total-meta');
+        if (totalMeta) totalMeta.textContent = '共 ' + MICRO_LOGS.length + ' 则 · 2026';
+        const hasOverflow = MICRO_LOGS.length > MICROLOG_COLLAPSED_COUNT;
+        const visibleLogs = (hasOverflow && !state.micrologsExpanded)
+          ? MICRO_LOGS.slice(0, MICROLOG_COLLAPSED_COUNT)
+          : MICRO_LOGS;
+        listEl.innerHTML = visibleLogs.map(function (item) {
           return (
             '<div class="microlog-item">' +
               '<div class="microlog-meta">' +
@@ -4006,6 +4102,20 @@
             '</div>'
           );
         }).join('');
+        const footerEl = document.getElementById('home-microlog-footer');
+        const toggleBtn = document.getElementById('toggle-micrologs-btn');
+        if (footerEl && toggleBtn) {
+          if (hasOverflow) {
+            footerEl.classList.remove('hidden');
+            const hiddenCount = MICRO_LOGS.length - MICROLOG_COLLAPSED_COUNT;
+            toggleBtn.setAttribute('aria-expanded', state.micrologsExpanded ? 'true' : 'false');
+            toggleBtn.textContent = state.micrologsExpanded
+              ? '收起更早的 ' + hiddenCount + ' 则短记 ↑'
+              : '展开更早的 ' + hiddenCount + ' 则短记 ↓';
+          } else {
+            footerEl.classList.add('hidden');
+          }
+        }
       }
 
       function renderArchiveView() {
@@ -4119,6 +4229,7 @@
         const post = BLOG_POSTS[actualIdx];
         if (!post) return;
         state.activePostId = post.id;
+        document.getElementById('nav-post-count').textContent = String(BLOG_POSTS.length);
 
         document.getElementById('reader-issue-badge').textContent = post.issueNo;
         document.getElementById('reader-cat-badge').textContent = post.categoryLabel;
@@ -4866,7 +4977,29 @@
         document.getElementById('close-lightbox-btn').addEventListener('click', closeArtworkLightbox);
         document.getElementById('lightbox-backdrop').addEventListener('click', closeArtworkLightbox);
 
+        function openProseImageLightbox(imgEl) {
+          if (!imgEl) return;
+          const post = BLOG_POSTS.find(function (p) { return p.id === state.activePostId; });
+          const fig = imgEl.closest('.prose-figure');
+          const cap = fig ? fig.querySelector('figcaption') : null;
+          const captionText = cap ? cap.textContent.trim() : '';
+          openArtworkLightbox({
+            eyebrow: (post ? post.issueNo : 'READER') + ' · 正文配图',
+            title: captionText || imgEl.getAttribute('alt') || (post ? post.title : '配图预览'),
+            sub: captionText && imgEl.getAttribute('alt') && captionText !== imgEl.getAttribute('alt') ? imgEl.getAttribute('alt') : '',
+            src: imgEl.getAttribute('src') || ''
+          });
+        }
+
         document.addEventListener('keydown', function (e) {
+          if (!state.lightboxOpen && (e.key === 'Enter' || e.key === ' ')) {
+            const proseImg = e.target && e.target.closest ? e.target.closest('img[data-prose-zoom]') : null;
+            if (proseImg) {
+              e.preventDefault();
+              openProseImageLightbox(proseImg);
+              return;
+            }
+          }
           if (state.lightboxOpen) {
             if (e.key === 'Escape') {
               e.preventDefault();
@@ -5028,6 +5161,19 @@
               return;
             }
 
+            if (btn.getAttribute('data-toggle-micrologs')) {
+              const wasExpanded = state.micrologsExpanded;
+              state.micrologsExpanded = !wasExpanded;
+              renderMicroLogs();
+              if (wasExpanded) {
+                const card = document.querySelector('.microlog-card');
+                if (card && card.getBoundingClientRect().top < 72) {
+                  card.scrollIntoView({ behavior: state.prefs.motionLevel === 'none' ? 'auto' : 'smooth', block: 'start' });
+                }
+              }
+              return;
+            }
+
             if (btn.getAttribute('data-open-reader-artwork')) {
               const post = BLOG_POSTS.find(function (p) { return p.id === state.activePostId; });
               if (post && post.cover) {
@@ -5054,6 +5200,12 @@
           }
 
           if (e.target.closest('a')) return;
+
+          const proseImg = e.target.closest('img[data-prose-zoom]');
+          if (proseImg) {
+            openProseImageLightbox(proseImg);
+            return;
+          }
 
           const card = e.target.closest('[data-read-card]');
           if (card) {

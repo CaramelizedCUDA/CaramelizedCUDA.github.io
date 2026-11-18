@@ -26,10 +26,46 @@ const ARTICLES_PLACEHOLDER = '/* __INJECT_ARTICLES_DATA__ */';
 const HEAD_META_PLACEHOLDER = '<!-- __INJECT_HEAD_META__ -->';
 
 const FAVICON_SVG =
-  '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">' +
-  '<rect width="64" height="64" rx="16" fill="#c86446"/>' +
-  '<text x="32" y="44" text-anchor="middle" font-size="34" font-weight="700" fill="#fcfaf6" ' +
-  'font-family="\'Songti SC\',\'STSong\',\'Noto Serif SC\',\'SimSun\',serif">焦</text>' +
+  '<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">' +
+  '<defs>' +
+  '<radialGradient id="bg" cx="46%" cy="38%" r="68%">' +
+  '<stop offset="0%" stop-color="#241813"/>' +
+  '<stop offset="65%" stop-color="#150e0b"/>' +
+  '<stop offset="100%" stop-color="#0e0907"/>' +
+  '</radialGradient>' +
+  '<linearGradient id="gold" x1="0%" y1="0%" x2="100%" y2="100%">' +
+  '<stop offset="0%" stop-color="#f5d3a6"/>' +
+  '<stop offset="52%" stop-color="#ce8649"/>' +
+  '<stop offset="100%" stop-color="#86451d"/>' +
+  '</linearGradient>' +
+  '<linearGradient id="ivory" x1="12%" y1="6%" x2="86%" y2="94%">' +
+  '<stop offset="0%" stop-color="#fef8ef"/>' +
+  '<stop offset="55%" stop-color="#edd1af"/>' +
+  '<stop offset="100%" stop-color="#c69668"/>' +
+  '</linearGradient>' +
+  '<linearGradient id="ribbon" x1="6%" y1="96%" x2="96%" y2="12%">' +
+  '<stop offset="0%" stop-color="#7c3c16"/>' +
+  '<stop offset="46%" stop-color="#df914d"/>' +
+  '<stop offset="78%" stop-color="#f6ca93"/>' +
+  '<stop offset="100%" stop-color="#9e5424"/>' +
+  '</linearGradient>' +
+  '</defs>' +
+  '<rect width="64" height="64" rx="14" fill="url(#bg)"/>' +
+  '<rect x="0.9" y="0.9" width="62.2" height="62.2" rx="13.2" fill="none" stroke="#dfa36c" stroke-opacity="0.26" stroke-width="0.9"/>' +
+  '<g transform="translate(32,32.4) scale(1.09) translate(-32,-32.4)">' +
+  '<path d="M22.2 15.2 C26.8 11.4 37.8 8.6 46.2 7.8 C48.4 7.6 49.6 9.2 49.2 14.5" fill="#18100c" stroke="url(#gold)" stroke-width="1.7" stroke-linecap="round"/>' +
+  '<path d="M26.5 14.6 C32.8 12.2 41.2 10.8 48.8 10.7" fill="none" stroke="url(#gold)" stroke-width="1.25" opacity="0.85" stroke-linecap="round"/>' +
+  '<rect x="21" y="14.4" width="32" height="34.4" rx="6.8" fill="#140d0a" stroke="url(#gold)" stroke-width="1.95"/>' +
+  '<rect x="23.5" y="16.9" width="27" height="29.4" rx="4.8" fill="none" stroke="#e4aa73" stroke-opacity="0.22" stroke-width="0.75"/>' +
+  '<path d="M34.2 48.8 H40.4 V58.4 L37.3 55.3 L34.2 58.4 Z" fill="url(#gold)"/>' +
+  '<path d="M45.8 19.2 C46.1 21.5 46.7 22.1 49 22.4 C46.7 22.7 46.1 23.3 45.8 25.6 C45.5 23.3 44.9 22.7 42.6 22.4 C44.9 22.1 45.5 21.5 45.8 19.2 Z" fill="#ebb477"/>' +
+  '<path d="M35.8 18.4 C31.8 16.2 27.2 15.5 22.4 16.3 C13.2 17.9 7.6 25 8.2 33.4 C8.8 41.1 15.1 46.2 23.8 46.2 C27.2 46.2 30.2 45.2 32.8 43.4 L32.2 42.4 C29.8 43.9 27.1 44.6 24.4 44.4 C17.6 43.9 13.7 38.4 13.8 31.1 C13.9 23.2 19.1 17.6 26.4 17.6 C30.4 17.6 33.1 19.5 34.1 24.4 L35.1 24.4 Z" fill="url(#ivory)"/>' +
+  '<path d="M25.6 25.8 H27.4 V42.2 C27.4 45.2 28.6 46.1 31.2 46.3 V47.2 H21.6 V46.3 C24.4 46.1 25.6 45.2 25.6 42.2 Z" fill="url(#ivory)"/>' +
+  '<path d="M41.8 26.2 H50.4 V27.1 C47.9 27.3 46.8 28.3 46.8 31.2 V47.6 H45.3 V31.2 C45.3 28.3 44.2 27.3 41.8 27.1 Z" fill="url(#ivory)"/>' +
+  '<path d="M17.2 55.2 C12.4 51.4 12.1 43.8 19.4 38.8 C24.6 35.2 31.2 34.4 36.8 36.2 L34.4 38.9 C29.6 37.9 24.4 38.9 20.1 42 C15.1 45.6 13.9 50.8 17.4 54.9 Z" fill="#0d0806" opacity="0.72" transform="translate(0,1.1)"/>' +
+  '<path d="M17.2 55.2 C12.2 51.3 12 43.6 19.5 38.5 C24.8 34.9 31.4 34.2 37 36.1 L34.5 38.8 C29.6 37.8 24.4 38.8 20.1 41.9 C15.1 45.5 13.9 50.8 17.5 54.9 Z" fill="url(#ribbon)"/>' +
+  '<path d="M22.4 25.2 H27.6 L46.6 43.5 V47.7 H45.8 L25.6 28.1 C24.6 27.1 23.7 26.3 22.4 26.1 Z" fill="url(#ivory)"/>' +
+  '</g>' +
   '</svg>';
 
 function stripBom(text) {
@@ -203,18 +239,24 @@ function buildPages(data, images) {
   return pages;
 }
 
-function sectionsToHtml(post) {
+function sectionsToHtml(post, uriToPath) {
   return (post.sections || [])
     .map((sec) => {
-      const body = String(sec.html || '')
+      let body = String(sec.html || '')
         .replace(/<button\b[^>]*>[\s\S]*?<\/button>/gi, '')
-        .replace(/\s+class="[^"]*"/g, '');
+        .replace(/\s+(?:class|data-prose-zoom|role|tabindex)="[^"]*"/g, '');
+      if (uriToPath) {
+        body = body.replace(/\bsrc="(data:image\/[^"]+)"/g, (m, uri) => {
+          const assetPath = uriToPath.get(uri);
+          return assetPath ? `src="${escapeHtml(SITE_URL + assetPath)}"` : m;
+        });
+      }
       return `<h2>${escapeHtml(sec.heading)}</h2>\n${body.trim()}`;
     })
     .join('\n');
 }
 
-function buildRss(data) {
+function buildRss(data, uriToPath) {
   const posts = [...data.BLOG_POSTS].sort((a, b) => b.date.localeCompare(a.date));
   const lastDate = posts.reduce((acc, p) => {
     const d = p.updated && p.updated > p.date ? p.updated : p.date;
@@ -235,7 +277,7 @@ function buildRss(data) {
         `      <pubDate>${new Date(postDateIso(post.date)).toUTCString()}</pubDate>`,
         `      <description>${escapeHtml(post.summary || post.subtitle || '')}</description>`,
         categories,
-        `      <content:encoded>${cdata(sectionsToHtml(post))}</content:encoded>`,
+        `      <content:encoded>${cdata(sectionsToHtml(post, uriToPath))}</content:encoded>`,
         '    </item>'
       ]
         .filter(Boolean)
@@ -300,7 +342,13 @@ function validateGeneratedHtml(html, label, { expectInlineImages }) {
     }
   }
 
-  const requiredPostIds = ['post-spawn-enoent', 'post-rust-sync-bugs', 'post-macos-sandbox'];
+  const requiredPostIds = [
+    'post-spawn-enoent',
+    'post-rust-sync-bugs',
+    'post-macos-sandbox',
+    'post-building-caramelized-notes',
+    'post-agent-second-pass'
+  ];
   for (const id of requiredPostIds) {
     if (!html.includes(`id: '${id}'`) && !html.includes(`id: "${id}"`)) {
       throw new Error(`[${label}] Missing post entry for id: ${id}`);
@@ -457,7 +505,7 @@ function main() {
     validateGeneratedHtml(notFoundHtml, '404.html', { expectInlineImages: false });
     writeFileEnsured(resolve(distDir, '404.html'), notFoundHtml);
 
-    writeFileEnsured(resolve(distDir, 'rss.xml'), buildRss(data));
+    writeFileEnsured(resolve(distDir, 'rss.xml'), buildRss(data, extracted.uriToPath));
     writeFileEnsured(resolve(distDir, 'sitemap.xml'), buildSitemap(data));
     writeFileEnsured(resolve(distDir, 'robots.txt'), `User-agent: *\nAllow: /\n\nSitemap: ${SITE_URL}/sitemap.xml\n`);
     writeFileEnsured(resolve(distDir, 'favicon.svg'), FAVICON_SVG + '\n');

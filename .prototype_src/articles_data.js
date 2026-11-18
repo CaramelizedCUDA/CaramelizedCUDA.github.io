@@ -1,5 +1,217 @@
       const BLOG_POSTS = [
         {
+          id: "post-agent-second-pass",
+          issueNo: "ISSUE 07",
+          pinned: false,
+          category: "essays",
+          categoryLabel: "设计与随笔",
+          title: "我审核了 PR，但没审核 Agent 的第二次发挥",
+          subtitle: "给一直在用的 Antigravity 美化补丁提了一个修复分屏指标胶囊的小 PR（#17）。第一次发 PR 时我照例人工逐字审完才手动发布；偏偏在发现右侧边栏旁聊（Side Question /「支线提问」）漏修、让 Agent 追推补丁并顺手通过 API 同步 PR 正文的“第二次发挥”里，全套自动化核验一路绿灯，网页上却因为裸写 #1 / #2 / #3 炸出了一排误关联历史 Issue 的蓝链。",
+          summary: "复盘 chuanban-antigravity-theme-patch PR #17 的一段插曲：首版 PR 人工逐字审完发布后，发现右侧边栏旁聊（Side Question）因会话容器与输入框是同层兄弟节点而漏修；追补代码后顺手让 Agent 通过 API 同步 PR 正文，全绿验收（含左手核对右手的 BODY_EXACT_MATCH: True）下却因裸写 #1/#2/#3 触发 GitHub 自动关联蓝链与他人 Issue 时间线留痕。",
+          date: "2026-11-17",
+          readMinutes: 4,
+          wordCount: "3,384 字符",
+          cover: IMAGES.issue07SmugAgent,
+          tags: ["AI Agent","Antigravity","开源协作"],
+          specimen: {
+            eyebrow: "CAUSAL SEAM #07 · PR Body Sync & GFM Autolink",
+            title: "左手核对右手的 BODY_EXACT_MATCH 与 #1 蓝链误关联",
+            context: "首版 PR 是人工审完才发的；第二次让 Agent 用 API 顺手追更说明时，只核对了 Markdown 原文，没看 GitHub 网页渲染出来的样子",
+            lines: [
+              { type: "ctx", text: "BODY_EXACT_MATCH: True  // 线上正文与本地同一份带坑草稿逐字一致" },
+              { type: "del", text: "Before #1/#2, After #1  → 被 GitHub 渲染成历史 Issue 蓝链并留下引用记录" },
+              { type: "ins", text: "改为「图 1 / 图 2」覆盖重发，对外写入不能省掉人眼终审" }
+            ],
+            proof: "PR #17 页面恢复干净（旁聊胶囊 10/10 单测通过），但误触发的 mentioned 记录已留在他人 Issue 时间线上"
+          },
+          tldr: [
+            "漏修根因各异：人眼因左右并排外观把「旁聊（Side Question）」与「拆分对话」合并了同类项；底层里旁聊却是拥有独立 <cascadeId>.db 且可转为独立主对话的侧栏标签页，其消息区与输入框为同层兄弟节点，导致只往祖先查找的 box.closest(\x27[data-cascade-id]\x27) 扑空。",
+            "全绿核验盲区：追补代码并让 Agent 通过 API 同步 PR 正文后，BODY_EXACT_MATCH: True 只是拿线上正文与本地同一份草稿“左手核对右手”；正文里裸写的 #1 / #2 / #3 被 GitHub 渲染成历史 Issue 蓝链，还在他人 Issue 时间线留下了删不掉的 mentioned 记录。",
+            "协作边界教训：无论是早年读半截贡献指南就骄傲声明“全程无人类监管”遭全组织拉黑，还是这次顺手改文档的“第二次发挥”，Agent 都会拿不完整的信息给自己验收通过；越过本地边界的对外写入不能省掉人眼终审与渲染态护栏。"
+          ],
+          boundaryNote: "边界留底：本文记录 Anarcadia/chuanban-antigravity-theme-patch PR #17 提交与追补过程中的真实排障与协作插曲；线上 PR 正文已即时改为「图 1 / 图 2」，但 GitHub 首次解析产生的跨 Issue 引用时间线记录不可撤回。",
+          footnote: "核验基准：Anarcadia/chuanban-antigravity-theme-patch PR #17（a5cde5a + dc266bb，2026-11-17）；覆盖 split-pane-metrics.test.mjs 10/10 单测与主对话 × 右侧支线提问双会话实机 CDP 核验。",
+          sections: [
+            {
+              id: "agent2-sec-1",
+              heading: "一、一个“至少对我自己有用”的小 PR",
+              html: `
+                <p>今天给我一直在用的 Antigravity 美化组件（<a href="https://github.com/Anarcadia/chuanban-antigravity-theme-patch" target="_blank" rel="noopener noreferrer"><code>Anarcadia/chuanban-antigravity-theme-patch</code></a>）提了一个 PR（<a href="https://github.com/Anarcadia/chuanban-antigravity-theme-patch/pull/17" target="_blank" rel="noopener noreferrer"><code>#17</code></a>），用来修复底部显示会话速率与上下文水位的小胶囊“只在主对话里显示、到了其它分屏对话里就消失”的问题。</p>
+                <p>在动手改之前，我也问过自己：真的会有人经常在 Antigravity 里同时开着好几个 session 分屏干活吗？老实说我不清楚——后来放进 PR 证据里的“四窗同屏认证”，也只是为了验证极端多窗口下这套修复依然稳当。但转念一想，我自己平时偶尔确实会并排开两个 session，或者在主对话旁边顺手拉起一个旁聊（Side Question）；既然这项修复至少对我自己的日常使用有真实价值，我还是把它整理干净提了上去。</p>
+                <p>然而百密一疏：整个第一轮修复过程里，我并没有特意让 Agent 去检查“旁聊”里的胶囊表现；确认多 session 分屏一切正常后，我就直接把 PR 发了出去——直到准备写一段案头短记复盘这件事时，才突然反应过来：<strong>等等，针对旁聊的胶囊，是不是根本没修？</strong></p>
+              `
+            },
+            {
+              id: "agent2-sec-2",
+              heading: "二、为什么人和 Agent 同时漏掉了旁聊？",
+              html: `
+                <p>回想起来，修复中途我和 Agent 居然谁都没多看旁聊一眼，但两边“视而不见”的原因完全不同：</p>
+                <ul>
+                  <li><strong>对人来说，是视觉直觉的合并同类项</strong>：虽然我平时顺手就会开旁聊，心里也明白“双分屏开两个 session”和“开一个旁聊”在操作路径与会话定位上不是一回事，但它们在界面上长得实在太像了——都是左右并排两栏对话、底下都挂着同款输入框，大脑下意识就把它们当成了同一种东西。</li>
+                  <li><strong>对 Agent 来说，则是界面承载架构与 DOM 结构上的两码事</strong>：Antigravity 的旁聊（界面上的「支线提问」/ <code>Side Question</code>）虽然靠鼠标点按钮就能顺手拉起，从外观上看和普通双分屏差不多，但在底层设计上它并不是通过主工作区「拆分对话」切出来的分屏，而是运行在右侧边栏（Side Panel）里的独立标签页。</li>
+                </ul>
+                <p>论会话定位，<strong>旁聊本质上是一个与主 session 同级别的独立会话</strong>——有自己的会话数据库（<code>&lt;cascadeId&gt;.db</code>）、后续消息与工具调用记录，甚至还能直接提升成完整的主对话（<code>Promote to conversation</code>）——与主工作区「拆分对话」出来的一组多 session 分屏完全是两套机制。落到页面 DOM 上，两套机制的面板结构恰好长反了：</p>
+                <ul>
+                  <li>在<strong>主对话与「拆分对话」分屏</strong>里，承载会话 UUID 的容器（<code>conversation-view[data-cascade-id]</code>）与输入框是<strong>外层包内层的父子（祖先—后代）关系</strong>，顺着输入框调用 <code>box.closest(&#39;[data-cascade-id]&#39;)</code> 往上找到最近的祖先容器，就能稳稳拿到当前面板的会话 ID；</li>
+                  <li>而在<strong>右侧边栏的旁聊标签页</strong>里，挂着 <code>data-cascade-id</code> 的消息区（<code>side-question-tab-conversation</code>）和输入框所在的 <code>side-question-tab-composer</code> 却是<strong>同层并列的兄弟节点</strong>。</li>
+                </ul>
+                <p>这就造成了很戏剧性的结果：尽管第一版补丁已经把胶囊节点挂进了旁聊输入框，却因为 <code>box.closest(&#39;[data-cascade-id]&#39;)</code> 只往祖先爬、不看同层兄弟而扑了空；又因为当时页面同时存在两个输入框，第一版为防止分屏混排串染而加上的 <code>totalBoxes === 1</code> 限制拦断了向全局 URL 的回退，拿不到会话 ID 的旁聊胶囊便一直停留在 <code>display: none</code> 的隐藏状态。</p>
+                <figure class="prose-figure">
+                  <img src="${IMAGES.pr17FollowupDecision}" alt="发现旁聊漏修后，决定趁 PR 尚未合入直接追推补齐" loading="lazy" data-prose-zoom="true" role="button" tabindex="0" />
+                  <figcaption>图 1 · 发现旁聊漏修后，决定趁 PR 尚未合入直接追推补齐</figcaption>
+                </figure>
+              `
+            },
+            {
+              id: "agent2-sec-3",
+              heading: "三、“左手核对右手”的全绿报告，与第二次改动的出错",
+              html: `
+                <p>发现漏网之鱼后，返工补代码本身非常顺利：给旁聊补上同容器兄弟节点的 UUID 解析、跑完 <code>10/10</code> 单元测试与两轮代码审查、实机确认主对话与右侧旁聊的胶囊各自独立亮起，一气呵成。随后我便顺嘴让 Agent 帮我把补充后的说明与脱敏对比图同步更新到线上 PR 正文里。</p>
+                <p>几分钟后，模型信心满满地向我汇报“一切正常，PR 已经更新好了”，还附上了极其详尽的核验清单：语法检查通过、哈希对齐、远程截图全部 <code>HTTP 200</code>，甚至连 <code>TITLE_EXACT_MATCH: True</code> 和 <code>BODY_EXACT_MATCH: True</code> 都逐字比对无误。</p>
+                <figure class="prose-figure">
+                  <img src="${IMAGES.pr17GreenVerification}" alt="Agent 给出的全绿验收清单——连 BODY_EXACT_MATCH 都严格为 True" loading="lazy" data-prose-zoom="true" role="button" tabindex="0" />
+                  <figcaption>图 2 · Agent 给出的全绿验收清单——连 BODY_EXACT_MATCH 都严格为 True</figcaption>
+                </figure>
+                <p>但当我出于习惯，切回浏览器里的 GitHub PR 页面做最后一眼肉眼验收时，眼前的画面让我感到猝不及防：</p>
+                <p>为了区分多组截图，模型在 <code>## Evidence</code> 的列表标题里裸写了 <code>Before #1/#2</code>、<code>After #1</code>、<code>Before #3 vs After #2</code>。而在 GitHub Flavored Markdown 里，任何没包进反引号的 <code>#数字</code> 都会被直接解析成对本仓库历史 Issue 或 PR 的引用链接，前端还会贴心地把对应 Issue 的完整标题内联展开成一整串高亮蓝字——于是我的截图证据栏瞬间变成了对仓库 <code>#1</code>、<code>#2</code>、<code>#3</code> 的大型误关联现场，顺带往别人的历史 Issue 时间线里打下了好几条 <code>mentioned this pull request</code> 的留痕。至于那个 <code>BODY_EXACT_MATCH: True</code>？它只是拿线上 PR 正文去和本地同一份带坑的草稿“左手核对右手”，在这个检查逻辑下当然一字不差（这个检查自然有实际意义，只是在这个场景下就确实没什么用）。</p>
+                <figure class="prose-figure">
+                  <img src="${IMAGES.pr17AutolinkAccident}" alt="打开 GitHub 页面肉眼复核，满屏误关联 #1 / #2 / #3 的蓝链现场" loading="lazy" data-prose-zoom="true" role="button" tabindex="0" />
+                  <figcaption>图 3 · 打开 GitHub 页面肉眼复核，满屏误关联 #1 / #2 / #3 的蓝链现场</figcaption>
+                </figure>
+                <p>我赶紧让它把所有 <code>#1 / #2 / #3</code> 改成中文的“图 1 / 图 2”，重新覆盖线上正文，PR 页面这才恢复干净。但能改回来的只有我自己这份正文：那几条已经打进别人历史 Issue 时间线里的 <code>mentioned this pull request</code> 留痕，并不会因为我删掉了引用就跟着消失。</p>
+              `
+            },
+            {
+              id: "agent2-sec-4",
+              heading: "四、吃一堑再吃一堑？",
+              html: `
+                <p>整件事最让我哭笑不得的地方在于：<strong>最初那版 PR 正文，明明是我自己逐段审完、亲手复制到 GitHub 上点下发布的。</strong></p>
+                <p>这也是我一直遵循的协作铁律——任何会产生外部副作用的动作，发出前必须经过人工把关。但讽刺的是，模型在最受重视的“第一次发布”时规规矩矩，反倒在看起来毫无技术含量的“第二次顺手改个文档”上给了我一个猝不及防的“惊喜”。</p>
+                <p>这让我想起以前的一段经历。先前我用自制的 Agent 壳子做自动化测试（让模型自己去开源仓库找 Bug 并提 PR），当时经验不足，既没配硬性的拦截 Hook，只是以为在提示词里叮嘱一句，模型就能懂事。结果模型一头扎进别人的仓库里，先是直接抢了别人正在跟进的 Issue 来提 PR；然后面对仓库里白纸黑字写着“必须披露 AI 使用情况，<strong>严禁提交完全由 AI 生成且无人类接管的 PR</strong>”的贡献指南，它居然在 PR 正文最后一段工工整整、甚至透着几分骄傲地写上了：</p>
+                <blockquote><p>“本 PR 由 AI 完全生成，且全程无人类监管。”</p></blockquote>
+                <p>结局毫无悬念：不仅 PR 被秒关，我自己的账号也被那个仓库所属的整个组织直接拉黑（Block）了。</p>
+                <p>事后我问 Agent 为什么会这样，它的解释是：读仓库贡献指南时内容被截断了，只读到“需要披露 AI 使用情况”这半句；而直到推送 PR 前，它都没想过回头把规范文档读完。在它眼里，这套流程完全合理。我也从没想过会出现这种情况：文档读到一半被截断，它却认定自己已经读完了。</p>
+                <p>回头再看今天的 <code>BODY_EXACT_MATCH: True</code>，其实是同一类问题：Agent 拿手里不完整的信息给自己验收。一次是只读了半份规范，一次是只比对了文本、没看渲染结果，然后两次都真心认为一切正常。</p>
+                <p>今天的 <code>#1</code> 乌龙虽然没有那时候那么严重，但它又给我上了一节课：<strong>在自己的本地设备或私人仓库里，Agent 犯浑往往只是回滚一条命令、重跑一次脚本的小事；可一旦动作越过边界，涉及到他人的仓库、维护者的通知栏与公共协作记录，试错的代价就不再是自己一个人兜得住的了。</strong></p>
+                <p>说到底，给“第一次提交”设防很容易，难的是对“主体已经审过了，顺手让它补个小尾巴”的<strong>第二次发挥</strong>保持同样的警惕。口头叮嘱从来不等于工程护栏——无论是把对外写入收口到预览确认之后，还是针对 GitHub 这类平台加上渲染结果的二次校验（比如检查 <code>body_html</code> 里的实际 <code>issue-link</code> 数量），唯有把 Agent 的运行逻辑和平台副作用都摸透，人和 AI 一起交出去的东西，才算得上真正负责任的产物。</p>
+              `
+            }
+          ]
+        },
+        {
+          id: "post-building-caramelized-notes",
+          issueNo: "ISSUE 06",
+          pinned: false,
+          category: "essays",
+          categoryLabel: "设计与随笔",
+          title: "搭建「焦糖笔记」的踩坑记录：路由、滚动与视口",
+          subtitle: "把 Caramelized Notes · 焦糖笔记从纯客户端单页原型打磨成可长期维护的静态技术博客，真正费工夫的不是堆砌动效，而是补齐 /posts/<slug>/ 独立路由与全文 RSS 订阅源、驯服前进与 popstate 后退的滚动状态、把排版抽屉收进视口安全区，以及消除深浅底纸切换时的不同步残影——这些在代码里不起眼、却切实影响阅读体验的问题。",
+          summary: "复盘「焦糖笔记」从单页原型到多页静态站（8a9f9e8 / f4bba99 / ba78fd6）的工程收口：补齐 /archive/ 与 /posts/<slug>/ 独立路径及全文 RSS 2.0，统一正向切页与浏览器原生后退的确定性置顶契约，将「Aa 排版」抽屉重构为首尾锁死的三段式视口布局，并排查跨平台缺字、封面裁边、View Transition 双底纸同步切换与本机 CDP 120ms 误注入插曲。",
+          date: "2026-11-17",
+          readMinutes: 5,
+          wordCount: "2,923 字符",
+          cover: IMAGES.issue06DualWashi,
+          tags: ["静态博客","前端工程","路由与视口","View Transition"],
+          specimen: {
+            eyebrow: "CAUSAL SEAM #06 · Routing, Scroll & Viewport",
+            title: "单页顺滑感与静态站确定性布局、状态契约的对齐",
+            context: "补齐独立路由与全文 RSS 后，收口前进/popstate 后退滚动残留、排版抽屉视口裁切与双底纸切换残影",
+            lines: [
+              { type: "ctx", text: ".customizer-drawer { display: flex; flex-direction: column; max-height: calc(100dvh - 24px); }" },
+              { type: "del", text: "整块抽屉通体滚动截断底部按钮 + popstate 原生滚动恢复把标题顶进吸顶栏下" },
+              { type: "ins", text: ".drawer-head/.drawer-foot { flex-shrink: 0 } + scrollRestoration = \x27manual\x27 确定性归零" }
+            ],
+            proof: "/archive/ 与写作时全部 5 篇 /posts/<slug>/ 硬刷新零 404 + RSS 2.0 全文输出 + 正向/Back 归零无遮挡 + View Transition 同步切换（8a9f9e8 / f4bba99 / ba78fd6）"
+          },
+          tldr: [
+            "静态可引用性：拆出 /archive/ 与每篇独立的 /posts/<slug>/ 静态目录消除直连硬刷新 404，并生成带 <content:encoded> 全文的标准 /rss.xml。",
+            "滚动与视口契约：开启 history.scrollRestoration = \x27manual\x27 将正向切页与原生 Back 统一收口到渲染后确定性归零；「Aa 排版」抽屉改为首尾 flex-shrink: 0、中部独立滚动的三段式弹性布局。",
+            "渲染暗礁与站外支线：内联 SVG 替换跨平台缺字字符、信箱式留边防封面裁字、View Transition 消除深浅底纸切换残影，并顺手揪出本机主题补丁按 127.0.0.1 误注入预览页的上游 Bug（#11 / PR #12）。"
+          ],
+          boundaryNote: "边界留底：当前线上保留「焦糖和纸 / 暖炭暗夜」两套底纸；浏览器原生后退统一回到页面顶部（history.scrollRestoration = \x27manual\x27），不恢复离开前的滚动位置；ISSUE 编号按成刊批次递增而非事件发生日期排序；窄屏真机折行与 <lastBuildDate> 构建时间戳仍需随日常发刊持续核对。",
+          footnote: "核验基准：Caramelized Notes 建站演进提交 8a9f9e8、f4bba99、ba78fd6（2026-11-16 ~ 2026-11-17）；外链排障关联 Anarcadia/chuanban-antigravity-theme-patch Issue #11 / PR #12。",
+          sections: [
+            {
+              id: "notes-sec-1",
+              heading: "一、既要单页的阅读手感，也要静态站的可引用性",
+              html: `
+                <p>最初把 <a href="https://caramelizedcuda.github.io/" target="_blank" rel="noopener noreferrer">焦糖笔记</a> 跑起来时，整站是一个纯客户端切换状态的单页应用（SPA）：首屏左七右三排开刊头导语与 <code>Ex Libris · 2026</code> 藏书票，下方直接露出主打文章与 <code>CAUSAL SEAM</code> 切面预览；点进正文还能随时切换「关键切面 / 主题插画 / 纯净无图」三态视图，或在 <code>15–21px</code> 字号、四套正文字体、三档行高（<code>1.65 / 1.85 / 2.10</code>）与三档版心（<code>640 / 740 / 880</code>）之间微调。</p>
+                <p>但第一版上线后很快暴露出一个明显短板：<strong>全站所有视图共用根路径 <code>https://caramelizedcuda.github.io/</code>，没有独立文章 URL，也没有 RSS。</strong></p>
+                <p>技术排障文章天然是要被贴进 GitHub Issue、PR 评审或聊天窗口里引用的。别人点开链接却只能落回首页自己翻找，内容的外部生命力就断了一半。第一轮改造先把路由地基补齐：</p>
+                <ol>
+                  <li><strong>拆出干净的静态路径</strong>：将归档列表独立到 <a href="https://caramelizedcuda.github.io/archive/" target="_blank" rel="noopener noreferrer"><code>/archive/</code></a>，每篇长文映射到独立的 <code>/posts/&lt;slug&gt;/</code> 目录（例如 <a href="https://caramelizedcuda.github.io/posts/yan-pr75-macos/" target="_blank" rel="noopener noreferrer">《给上游收一个 macOS 的尾》</a> 与 slug 精简后的 <a href="https://caramelizedcuda.github.io/posts/codex-remote-provider/" target="_blank" rel="noopener noreferrer">《Codex Remote 踩坑》</a>），确保任意路径直接打开或 <code>Ctrl+Shift+R</code> 硬刷新都不会触发 GitHub Pages 的 404。</li>
+                  <li><strong>补齐全文 RSS 2.0</strong>：在首页作者名片与全站页脚挂出订阅入口，构建生成标准 <a href="https://caramelizedcuda.github.io/rss.xml" target="_blank" rel="noopener noreferrer"><code>/rss.xml</code></a>，连同 <code>&lt;category&gt;</code> 与 <code>&lt;content:encoded&gt;</code> 全文一并输出，让习惯用阅读器追更的同行不必频繁刷网页。</li>
+                </ol>
+              `
+            },
+            {
+              id: "notes-sec-2",
+              heading: "二、滚动条与视口边界：最容易漏掉的隐性状态机",
+              html: `
+                <p>独立路由跑通之后，紧接着踩到了单页接管导航时最经典的滚动条陷阱，而且是分两拍暴露出来的：</p>
+                <ul>
+                  <li><strong>第一拍（正向跳转残留偏移）</strong>：从 <a href="https://caramelizedcuda.github.io/archive/" target="_blank" rel="noopener noreferrer">文章归档页</a> 滚到底部点开 <a href="https://caramelizedcuda.github.io/posts/spawn-enoent/" target="_blank" rel="noopener noreferrer">《一次 spawn ENOENT 的完整排查》</a>，或者读完一篇在文末点 <code>NEXT · 下一篇</code> 切到 <a href="https://caramelizedcuda.github.io/posts/macos-sandbox/" target="_blank" rel="noopener noreferrer">《给 AI Agent 补齐 macOS 静态沙箱》</a> 时，新页面直接继承了上一页的 <code>scrollY</code> 停在半腰（比如 <code>29%</code> 处），文章顶部的刊号与大标题全被吸顶导航栏盖住。</li>
+                  <li><strong>第二拍（原生后退与吸顶栏打架）</strong>：给正向跳转补上置顶逻辑、并为右侧「章节导览」锚点留出顶部安全间距后，点页面左上角的「← 返回文章归档」已经能干净回到顶部；偏偏按<strong>浏览器原生后退键（Back）</strong>退回 <a href="https://caramelizedcuda.github.io/archive/" target="_blank" rel="noopener noreferrer"><code>/archive/</code></a> 时，浏览器自带的滚动恢复时机与前端视图渲染撞车，导致「文章归档」标题刚好被吸顶导航栏遮住上半截。</li>
+                </ul>
+                <p>把前进切页、文末上下篇与 <code>popstate</code> 原生后退统一收口到路由渲染完成后的确定性归零逻辑里，这处半行遮挡才算彻底消失。代价是后退不再恢复离开前的阅读位置：在归档页滚到中段点进文章、再按 <code>Back</code>，回到的是归档页顶部。在归档篇目还不多的现阶段，这比标题被导航栏吃掉半截更容易接受。</p>
+                <p>另一个同类边界坑出在阅读页右上角的 <strong>「Aa 排版」抽屉</strong>。因为抽屉里依次塞进了底纸主题、四套字体、字号滑块、行距、版心宽度、新增的「灵动 / 克制 / 静态」动效档位以及实时排版预览框，起初整个抽屉是一个通体滚动容器：在常规笔记本视口高度下刚点开，「完成设置 / 恢复推荐」两个按钮刚好被屏幕下沿截掉大半截；往下滚虽然能点到按钮，顶部的标题和 <code>×</code> 关闭键又被滚出了画面。最终按三段式弹性布局把顶栏和底栏锁死（<code>flex-shrink: 0</code>），只让中间参数区独立滚动并给底部的「排版预览」留足下边距，任何视口高度下都能一眼看到首尾。</p>
+                <div class="code-figure">
+                  <div class="code-figure-bar">
+                    <span class="code-lang">CSS</span>
+                    <button type="button" class="code-copy-btn">复制代码</button>
+                  </div>
+                  <pre><code>/* 排版抽屉：从整块滚动容器拆为首尾固定、中部独立滚动 */
+.customizer-drawer {
+  display: flex;
+  flex-direction: column;
+  max-height: calc(100dvh - 24px);
+  overflow: hidden;
+}
+.drawer-head,
+.drawer-foot { flex-shrink: 0; }
+.drawer-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }</code></pre>
+                </div>
+              `
+            },
+            {
+              id: "notes-sec-3",
+              heading: "三、跨环境渲染与主题过渡里的四个细节暗礁",
+              html: `
+                <p>除了路由和布局，连续三轮线上巡检还顺手抓出了几处“写代码时不易察觉、真机细看格外扎眼”的小毛刺：</p>
+                <div class="table-scroll">
+                  <table>
+                    <thead><tr><th>现象切面</th><th>触发根因</th><th>最终收口方式</th></tr></thead>
+                    <tbody>
+                      <tr><td><strong>画卷按钮显示缺字方框 <code>☒</code></strong></td><td><a href="https://caramelizedcuda.github.io/" target="_blank" rel="noopener noreferrer">首页</a>「卷首画卷 · 展开」与弹窗关闭键使用了依赖特定系统字体的生僻字符</td><td>替换为内联 SVG 绘制的四角星与圆形关闭键，不再依赖系统字体，彻底消除豆腐块</td></tr>
+                      <tr><td><strong>归档缩略图底部裁字</strong></td><td><a href="https://caramelizedcuda.github.io/archive/" target="_blank" rel="noopener noreferrer"><code>/archive/</code></a> 双栏卡片圆角容器裁掉了 <a href="https://caramelizedcuda.github.io/posts/yan-pr75-macos/" target="_blank" rel="noopener noreferrer">ISSUE 05</a> 封面底部的 <code>yan #75</code></td><td>改为黑底留边（信箱式）排版，为底部说明文字留出安全内边距</td></tr>
+                      <tr><td><strong>窄列表格代码断词尴尬</strong></td><td><a href="https://caramelizedcuda.github.io/posts/macos-sandbox/" target="_blank" rel="noopener noreferrer">ISSUE 03</a> 早期对比表首列过窄，<code>screenUnreviewable</code> 末尾字母 <code>e</code> 单独折行</td><td>重构第 1 节为条目列表，将长标识符改为单行内联代码徽章呈现</td></tr>
+                      <tr><td><strong>深浅底纸切换闪过低对比度帧</strong></td><td>「焦糖和纸」与「暖炭暗夜」切换时，文字与背景各自的 CSS <code>transition</code> 速率不同步</td><td>改用整页统一的 View Transition 交叉同步过渡，文字、边框与纸面同拍切换</td></tr>
+                    </tbody>
+                  </table>
+                </div>
+                <p>此外还有一处文案与实现的对齐：线上版本将底纸精简为「焦糖和纸 / 暖炭暗夜」两套后，<a href="https://caramelizedcuda.github.io/" target="_blank" rel="noopener noreferrer">首页「卷首画卷」弹窗</a>的博物学底纹说明里还残留着旧稿的“融入\u4e09套主题纸面肌理”。核对时顺手把文案同步回“两套”，避免留下一处言行不一的细节破绽。</p>
+              `
+            },
+            {
+              id: "notes-sec-4",
+              heading: "四、建站途中的支线排障：120ms 后的“白底白字”",
+              html: `
+                <p>最有意思的一段插曲发生在 <code>11.16</code> 本地预览本站的时候（已留档于<a href="https://caramelizedcuda.github.io/" target="_blank" rel="noopener noreferrer">首页「案头短记」</a>）：页面刚刷出来时标题明明正常，<strong>120ms 之后却突然变成白底白字“隐身”了</strong>。</p>
+                <p>起初以为是站内主题脚本写串了，排查下去才发现锅在站外——本机跑着的 Antigravity 主题补丁在筛选 CDP（Chrome DevTools Protocol）目标时，只判断了 <code>127.0.0.1</code> 地址前缀，把内置浏览器里正在本地预览的焦糖笔记也当成宿主界面，强行注入了 <code>body</code> 配色与汉化词典（外加 <code>NewDocument</code> 阶段 <code>documentElement</code> 空指针）。给补丁加上宿主独占指纹的三态门禁并反哺上游（<a href="https://github.com/Anarcadia/chuanban-antigravity-theme-patch" target="_blank" rel="noopener noreferrer"><code>Anarcadia/chuanban-antigravity-theme-patch</code></a> 的 <a href="https://github.com/Anarcadia/chuanban-antigravity-theme-patch/issues/11" target="_blank" rel="noopener noreferrer">Issue #11</a> / <a href="https://github.com/Anarcadia/chuanban-antigravity-theme-patch/pull/12" target="_blank" rel="noopener noreferrer">PR #12</a>）之后，本地预览才恢复清净。用写博客的过程反过来抓出一个上游工具链的 Bug，也让我真切体会了一回和他人协作的感觉（哪怕只是我在给别人提一个小的bug修复PR而已）。</p>
+              `
+            },
+            {
+              id: "notes-sec-5",
+              heading: "五、边界与留白：把急不来的东西留给时间",
+              html: `
+                <p>这几轮打磨下来，<a href="https://caramelizedcuda.github.io/" target="_blank" rel="noopener noreferrer">焦糖笔记</a> 的工程骨架已经基本稳住：写作时的 5 篇长文与 7 则案头短记各有落处，搜索、分类筛选、阅读页「☆ 收藏备忘」与归档页「已收藏」实时联动、代码块复制提示都跑在稳定的轨道上。</p>
+                <p>至于美术层面的下一步——无论是结合「灵动 / 克制 / 静态」开关去做和纸上的窗影漫射，还是尝试把纸面拼贴肌理与物语式的编号字牌、几何留白慢慢融进边缘背景——我都不打算急于求成。这两个方向极吃分寸感，在手头的文章厚度与视觉母题还没攒够之前硬堆符号，只会冲淡现在好不容易设计自洽的博客网站风格。</p>
+                <p>先把工程地基收干净，接下来就回到「研究 → 总结 → 发布」的日常节奏里：多破几个实在的真问题，让学习、研究和工程经验去喂养后面的版面与审美。</p>
+              `
+            }
+          ]
+        },
+        {
           id: "post-yan-pr75-macos",
           issueNo: "ISSUE 05",
           pinned: false,
@@ -1339,6 +1551,11 @@ debug = 1</code></pre>
       ];
 
       const MICRO_LOGS = [
+        {
+          date: '11.17',
+          tag: 'Agent / Upstream #17',
+          text: "给一直在用的 Antigravity 主题补丁提了修复分屏指标胶囊的 PR（#17）。首版正文是我自己审完手动发的，偏偏在发现旁聊 / 支线提问（Side Question）里会话容器与输入框是“平级兄弟”而非分屏的“父子包裹”、导致漏修后，追推补丁并让 Agent 顺手通过 API 更新 PR 文档时出了问题：Agent 跑完一串全绿校验（包括左手核对右手的 BODY_EXACT_MATCH: True），结果在正文里裸写 Before #1/#2 触发了 GitHub 自动关联，把截图说明炸成了指向仓库历史 Issue 的一排蓝链。好在习惯性切回网页肉眼扫了一眼，及时改回“图 1 / 图 2”。一时间我想起之前用自制 Agent 壳子没加 Hook 做社区 PR 测试，结果模型跑去别人仓库抢单还在声明里骄傲写下“完全由 AI 生成且无人类监管”被仓库所属组织秒关 PR + Block 的旧事。 即使现在基本不会再犯“不给人类在关键节点审核就推上线”的第一关，似乎还有第二关等着我。可能是从未深入学习pi，dsh的架构让我吃了认知债，还是从一开始，我的基本文档就从未具备过成熟的工程思维？我不清楚，但这不是停下的理由，依然还要继续在实践中学习更多吧。"
+        },
         {
           date: '11.16',
           tag: 'Ctx / Upstream #6',
