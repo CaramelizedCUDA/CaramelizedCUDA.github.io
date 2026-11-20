@@ -1,5 +1,162 @@
       const BLOG_POSTS = [
         {
+          id: "post-macos-adapt-four-days",
+          issueNo: "ISSUE 08",
+          pinned: false,
+          category: "engineering",
+          categoryLabel: "工程与系统",
+          title: "没有实体 Mac 的四天：用 VM 与多 Agent 协作完成开源项目 macOS 适配",
+          subtitle: "手里没有实体 Mac，也没有停下来的理由。四天里靠云端 ARM64 macOS VM 和「主会话开发 + 独立会话复核 + 上游评审」连续合入 5 个 PR。v1.4.0 的打包与完整性验收通过。正式 ZIP 在 VM 里手动解压时提示「已损坏」，还没能做实体 Mac 对照。",
+          summary: "没有实体 Mac 的四天：在云端 ARM64 macOS VM 上连续合入 yan #103 / #105 / #109 / #111 / #117 五个 PR。记录信号清理、系统工具链探测和 Edge headless（728 过 / 53 败）的实测，#111 打了 30 轮补丁仍无法完全修复后改用词法扫描的过程，访达「已损坏」的四组对照实验，以及多 Agent 如何参与开源协作。",
+          date: "2026-11-20",
+          readMinutes: 10,
+          wordCount: "6,478 字符",
+          cover: IMAGES.macosVmWorkbench,
+          tags: ["macOS","多 Agent 协作","开源适配","对照实验","yan"],
+          specimen: {
+            eyebrow: "CAUSAL SEAM #08 · shellWord & scanWrites",
+            title: "安全边界：先按词法解码，再谈判定",
+            context: "macOS 命令静态筛查要拦 socketfilterfw / sysadminctl / dscl 的写操作；第一版用正则扫命令名和写选项，被独立复核会话连挑 30 轮边界绕过",
+            lines: [
+              { type: "ctx", text: "第一版：正则匹配命令名 + 写选项 → 缩写、引号、重定向不断冒出新绕过" },
+              { type: "del", text: "沿补丁打 30 轮：fd 重定向、&> 断句、续行符拼接、PowerShell UNC……" },
+              { type: "ins", text: "重写为 shellWord / argumentsAt / commandInvocations / scanWrites 结构化词法扫描" }
+            ],
+            proof: "38 条专项 + 815 条全量单测全绿后 Codex 仍抓出 2 条 P1——边界问题该换抽象层，而不是继续打补丁"
+          },
+          tldr: [
+            "信号清理、系统工具链探测和 Edge 157 headless 全量端到端（728 过 / 53 败均卡渲染帧）都在云端 ARM64 macOS VM 上实测。四组对照和完整性校验确认这次问题不在打包器。手动解压正式 ZIP 时的报错可能与 Devin 的 macOS VM 环境限制有关，还需要在实体 Mac 上做对照。",
+            "做 #111 是最挣扎的一个阶段。30 轮补丁依然无法完全修复引号、转义、重定向和嵌套语句带来的边界问题，最后改用 shellWord / scanWrites 做词法与重定向扫描。",
+            "多 Agent 流水线跑顺：主会话实现 + 独立会话只报 P0/P1 复核 + Codex 自动评审 + 上游作者评审，四天合入 5 个 PR（#103 / #105 / #109 / #111 / #117），最快 26 分钟、最磨人滚出 39 commits。",
+            "协作规范固化成铁律后零返工：一律从干净 upstream/main 建分支、显式检查署名、对外文字逐条核对中文语气、PAT 提前配齐 workflow 权限。"
+          ],
+          boundaryNote: "边界留底：验收基于 Devin 的 macOS VM。实体 Mac 的下载、解压与首次双击 start.command，以及 Intel 机型、其他 macOS 大版本与真实云账号均未实机覆盖。手动解压和首次打开启动器时的报错可能与 VM 环境限制有关，底层原因待查，#117 验收报告标为「待真机确认」。",
+          footnote: "核验基准：Master-Norna/yan PR #103 / #105 / #109 / #111 / #117（2026-11-16 至 11-20 全部合入）；覆盖 Node 22 / 24 单测 854 通过、Chrome 全量端到端 1330 通过、v1.4.0 跨版本数据迁移与 Seatbelt 原生回归。",
+          sections: [
+            {
+              id: "vm4d-sec-1",
+              heading: "背景",
+              html: `
+                <p>前几天给开源项目 <a href="https://github.com/Master-Norna/yan" target="_blank" rel="noopener noreferrer">Master-Norna/yan</a> 做了一轮集中收尾的 macOS 适配。</p>
+                <p>这个项目是一个本地运行的 AI 对话与工作台工具，包含 Node 桥接服务、Web 前端、MCP 桥接、命令静态筛查和 macOS Seatbelt 沙箱。上游的定位非常明确：<strong>Windows 是兼容性基准，macOS 只求「能用」，不做 Linux 适配</strong>。</p>
+                <p>在上一篇<a href="https://caramelizedcuda.github.io/posts/yan-pr75-macos/" target="_blank" rel="noopener noreferrer">《给上游收一个 macOS 的尾》</a>里，PR #75 刚把基础适配和严档 Seatbelt 接进主干，同时也坦诚留了几处边界：环境工具包在 macOS 上只做了降级报错、Edge headless 还没验、Seatbelt 靠手动探针还没进回归，PAT 缺 <code>workflow</code> 权限也只是临时绕了过去。</p>
+                <p>有意思的地方在于，到了这一轮，我手里依然没有一台真实 Mac。从 11 月 16 日下午 #75 合入后到 20 日早上，我靠云端 ARM64 macOS VM 和一套「主会话开发 + 独立会话复核 + 上游评审」的协作流程，连续推进并合入了 4 个适配 PR，再补了一轮面向 v1.4.0 的全面验收与测试修复 PR。</p>
+                <p>如果说 #75 更像是一次「解冲突、守契约」的单点收尾，那这四天则更像一次系统性的实战演练：既有在真机缺失下做对照实验的克制，也有把正则一路打补丁到第 30 轮的教训，还有一套真正跑顺了的多 Agent 开源协作节奏。</p>
+              `
+            },
+            {
+              id: "vm4d-sec-2",
+              heading: "一、这四天的时间线",
+              html: `
+                <p>这一轮的目标很直接：顺着 #75 留下的遗留项逐一清干净，然后在上游发布 v1.4.0（首次提供 ARM Mac 便携 ZIP）后做一次完整验收。以下均为东八区时间：</p>
+                <div class="table-scroll">
+                  <table>
+                    <thead><tr><th>PR</th><th>创建 → 合并</th><th>规模与提交</th><th>推进经过</th></tr></thead>
+                    <tbody>
+                      <tr><td><a href="https://github.com/Master-Norna/yan/pull/103" target="_blank" rel="noopener noreferrer">#103</a> Seatbelt 原生回归与信号清理</td><td>11-16 23:26 → 11-17 14:35</td><td>+488/-6，13 commits</td><td>2 轮独立复核 + Codex + 作者 2 轮评审；清掉误带入的本地配置，补齐宿主信号监听共存与失败路径清理。</td></tr>
+                      <tr><td><a href="https://github.com/Master-Norna/yan/pull/105" target="_blank" rel="noopener noreferrer">#105</a> 探测系统 Python / Node / ffmpeg</td><td>11-17 16:08 → 11-17 20:10</td><td>+403/-55，6 commits</td><td>1 轮独立复核；上游作者直接在分支上补交了不可执行探测修复，1 小时内按 Codex P1 去掉 macOS 隔离环境提示并对齐 PATH 顺序。</td></tr>
+                      <tr><td><a href="https://github.com/Master-Norna/yan/pull/109" target="_blank" rel="noopener noreferrer">#109</a> macOS Edge headless 结论备注</td><td>11-18 21:44 → 11-18 22:10</td><td>+1/-1，1 commit</td><td>实测 Edge 157 全量端到端（728 过 / 53 败，均卡渲染帧），拿数据定案后 26 分钟合入；同步确认 <code>brew install</code> 由上游接手（#107）。</td></tr>
+                      <tr><td><a href="https://github.com/Master-Norna/yan/pull/111" target="_blank" rel="noopener noreferrer">#111</a> 防火墙/账户规则与双平台解析</td><td>11-19 07:39 → 11-19 21:49</td><td>+723/-78，39 commits</td><td>11-18 下午起与复核会话拉锯 30 轮，把正则演进为词法与重定向解析；开 PR 后再修 Codex 2 条 P1 和作者提出的变体，当晚合入。</td></tr>
+                      <tr><td><a href="https://github.com/Master-Norna/yan/pull/117" target="_blank" rel="noopener noreferrer">#117</a> v1.4.0 全面验收与测试修复</td><td>11-19 23:59 → 11-20 08:51</td><td>+9/-9，2 commits</td><td>2 个复核会话分别验证端口预检清理和思绪冷读隔离；补齐令牌 <code>workflow</code> 权限后推送，CI 4/4 全绿，次日早合入。</td></tr>
+                    </tbody>
+                  </table>
+                </div>
+                <p>5 个 PR 全部合入，节奏差异却非常明显：最快的 #109 只用了 26 分钟，最磨人的 #111 滚出了 39 个 commit。复盘下来，真正值得记录的成长集中在下面三个技术案例和一套协作习惯里。</p>
+              `
+            },
+            {
+              id: "vm4d-sec-3",
+              heading: "二、三个最有意思的技术案例",
+              html: `
+                <h3 id="vm4d-h3-1">1. 用实测代替猜测：信号清理、系统工具链与 Edge headless</h3>
+                <p>跨平台适配最怕靠脑补做决定，这轮有三次关键节点都是靠直接跑实测才把方向定死的。</p>
+                <p>第一次是在 <strong>#103</strong>。我们在 #75 手动探针的基础上补齐了 macOS 严档 Seatbelt 的原生自动化回归，同时确保桥接进程被 <code>SIGTERM</code> / <code>SIGINT</code> 杀掉时，不会把后台指令留成孤儿进程。初版做法是在信号处理里杀掉子进程树后，再向自己重发同名信号走默认终止。上游作者一眼看出问题：<strong>默认信号终止不会触发 Node 的 <code>exit</code> 事件</strong>，这会绕过宿主注册的其他退出清理（比如 MCP 和无头浏览器），还会和宿主自身的信号监听打架。最终改成在信号回调里先收掉在跑的 shell，如果检测到宿主挂了持久监听就把控制权交还宿主，只在没有宿主接管时才走 <code>process.exit</code>，并补上了同进程加载多份模块共用一套退出钩子的边界。</p>
+                <p>第二次是在 <strong>#105</strong>。之前 macOS 上的「环境」页只是老实提示仅支持 Windows，这一轮我们决定不再让 macOS 背 Windows 便携环境包，而是按 <code>/opt/homebrew/bin</code>、<code>/usr/local/bin</code> 和 <code>PATH</code> 探测系统里现成的 Python、Node、ffmpeg。这里有个很隐蔽的坑：一开始只检查二进制「存在且可执行」，但如果 Homebrew 里那份缺动态库或架构不匹配，版本探针会失败，逻辑却已经 <code>break</code> 了。作者直接往 PR 分支补了一个提交跳过跑不通的可执行文件；我们紧接着按 Codex 的 P1 意见，去掉了 macOS 上误导模型「往独立隔离环境里装包」的系统提示，并让 <code>PATH</code> 的目录顺序严格跟着探测结果走，保证终端里敲命令名命中的就是状态卡上显示的那一份。</p>
+                <p>第三次是最干脆的 <strong>#109</strong>。之前一直把 macOS 上的 Edge headless 标成「未验」。与其一直挂着问号，不如在 VM 上用 Edge 157 原样跑一遍全量端到端：结果是 <strong>728 通过 / 53 失败</strong>，所有失败都集中在依赖渲染帧的路径上（<code>requestAnimationFrame</code> 在 macOS Edge headless 下产不出帧），而同一套参数换成 Chrome 全绿。把这组数字贴给上游后，#109 这 1 行 <code>ci.yml</code> 注释只用了 26 分钟就合并了。同时汇报的 <code>brew install</code> 沙箱实测，也让上游决定直接复用逐条出沙箱请示来修（#107），帮我们省掉了一个本来打算开的文档 PR。</p>
+                <h3 id="vm4d-h3-2">2. #111 的教训：从三条正则滚雪球到 30 轮迭代</h3>
+                <p>做 <strong>#111</strong> 是我这轮最挣扎的一个阶段。</p>
+                <p>起因非常单纯：macOS 的命令静态筛查规则表里缺了三个系统管理命令——<code>socketfilterfw</code>（防火墙）、<code>sysadminctl</code>（账户管理）和 <code>dscl</code>（目录服务），需要做到「拦写放查」。</p>
+                <p>第一版提交只改了很少的代码，用正则去扫命令名和写选项。然后把它交给了独立复核会话，只要求报 P0/P1。结果一发不可收拾：</p>
+                <ul>
+                  <li>复核挑出缩写选项、引号拆词、命令路径前缀和 <code>dscl</code> 参数位绕过；</li>
+                  <li>修完一轮，又查出紧贴重定向、<code>fd</code> 重定向、<code>&amp;&gt;</code> 在 bash 与 dash 下的不同断句、续行符拼接选项；</li>
+                  <li>再往下挖，涉及前置重定向、参数间夹杂重定向、双引号正文里的内嵌 shell 指令、以及写路径判定在 POSIX 和 PowerShell 两种语法之间的歧义。</li>
+                </ul>
+                <p>打了 <strong>30 轮</strong>补丁，边界问题依然没能完全修复，我最后改用 <code>shellWord</code>、<code>argumentsAt</code>、<code>commandInvocations</code> 和 <code>scanWrites</code> 做词法与重定向扫描。更扎心的是，哪怕内部复核已经跑到零 P0/P1、38 条专项和 815 条全量单测全绿，PR 一发出去，Codex 还是抓出了 2 条实打实的 P1（<code>&amp;&gt;</code> 在 dash 语法下丢了主调用、PowerShell 引号里的 UNC 输出路径解码遗漏）。</p>
+                <p>复盘 #111，教训非常清楚：<strong>安全边界一旦开始涉及引号、转义、重定向和嵌套语句，正则就不再是合适的抽象层</strong>。在第三、第四轮发现绕过手法不断冒头时，就应该果断停下来，把「按词法解码再判定」作为整体设计重写一遍，而不是沿着正则一路打补丁。硬着头皮补了二十多轮才切到结构化解析，反而既耗时间又容易留下边角缝隙。</p>
+                <h3 id="vm4d-h3-3">3. 没有真机怎么定性环境问题：面对「访达报已损坏」怎么做对照</h3>
+                <p>四个功能 PR 合并、上游发布 v1.4.0 后，我基于干净的 <code>v1.4.0</code>（<code>f607b81</code>）在 macOS VM 上做了一次全面验收：Node 22 / 24 单测（均 854 通过、7 个 Windows 专属跳过）、类型与格式检查、Seatbelt 原生测试、Chrome 全量端到端、源码桌面操作、真实本地 CPU 模型流式对话、以及 v1.3.12 跨版本数据迁移，全都顺利通过。</p>
+                <p>真正的波折出在正式 ZIP 的桌面首次启动上：</p>
+                <ul>
+                  <li>用命令行 <code>ditto</code> 解压正式 ZIP，包内 Node 24.22.0 启动桥接、跑通本地模型对话，一切正常；</li>
+                  <li>打开 Safari 的「打开安全文件」自动解包，6,375 项文件与 ZIP 清单逐项核对完全一致，SHA-256 匹配，<code>unzip -tq</code> 通过；</li>
+                  <li>但只要在访达里<strong>手动双击</strong> Safari 下载的正式 ZIP，或者双击自动解包出来的 <code>start.command</code>，系统就会直接弹出「已损坏，无法打开」，而且「隐私与安全性」里还不提供「仍要打开」。</li>
+                </ul>
+                <p>如果只看到这个现象，很容易误判成「v1.4.0 打包出了问题」，甚至动念头去改 <code>pack/pack.mjs</code> 或 <code>start.command</code>，或者为了“跑通”偷偷删掉下载隔离属性（macOS 的 <code>quarantine</code> xattr）。</p>
+                <p>这两种做法都不对。前者会误伤正常的打包器，后者等于自己作弊。于是我做了四组对照实验，全程保留隔离属性、不改系统安全设置：</p>
+                <ol>
+                  <li><strong>纯文本 ZIP 对照</strong>：用 Safari 下载一个只含纯文本的小 ZIP，访达双击同样报「已损坏」；</li>
+                  <li><strong>第二台 VM 交叉复验</strong>：另起一台同版本 macOS 26.6.2（25G83）VM 重复上述流程，正式包和纯文本 ZIP 全部复现；</li>
+                  <li><strong>无害脚本对照</strong>：用和正式包完全相同的 <code>ditto</code> 参数打包一个只有一行 <code>printf</code> 的 <code>.command</code>，Safari 下载解包后双击照样被拦；</li>
+                  <li><strong>无隔离本机原件对照</strong>：把逐字节、权限完全一致的同一个脚本直接放在本机（无下载隔离属性），双击立刻正常运行。</li>
+                </ol>
+                <figure class="prose-figure">
+                  <img src="${IMAGES.macosFinderEvidence}" alt="正式 ZIP、纯文本 ZIP 和 Safari 下载的无害脚本均被访达拦截。同一脚本的本机原件可以运行。两种 ZIP 的提示均在两台同版本 VM 上复现。" loading="lazy" data-prose-zoom="true" role="button" tabindex="0" />
+                  <figcaption>图 1 · 访达「已损坏」的实测对照。<a href="https://github.com/Master-Norna/yan/pull/117#issuecomment-7014460226" target="_blank" rel="noopener noreferrer">查看 #117 的 macOS VM 验收报告</a></figcaption>
+                </figure>
+                <p>四组对照和完整性校验让我确认，这次问题不在打包器，<strong>正式 ZIP 的打包与完整性通过验收</strong>。系统日志记录了 LaunchServices 在下载隔离检查阶段暂缓启动，以及 VM 侧 XProtect 分析失效。手动解压正式 ZIP、首次打开启动器时的报错可能与 Devin 的 macOS VM 环境限制有关，底层原因还没查明。我把这一项在验收报告里标为「VM 无法验收，待真机确认」。</p>
+                <p>有意思的是，这轮全面验收虽然没测出产品代码的大 Bug，却顺手抓出了测试框架自身的两个隐蔽问题，最终整理成 <strong>#117</strong> 合入上游：</p>
+                <ul>
+                  <li><code>test/run.mjs</code> 原先在端口预检之前就清空了 <code>test/.tmp</code>。只要上一轮测试还没结束就误起了第二个 runner，后者会先把前一轮的浏览器资料和诊断文件删光，再报端口占用退出。把清理移到端口预检之后即可解决。</li>
+                  <li><code>test/cold-trail-thought.mjs</code> 在 Node 24 串行全量中偶发失败。排查发现用例在桥接写盘后立即于同一浏览器源内切页，上一页 <code>beforeunload</code> / <code>pagehide</code> 写入 IndexedDB 的离页暂存把已读思绪带进了下一页，导致新页面不再发出预期的 <code>/api/chats/trail/get</code>。改为写入走 <code>127.0.0.1</code>、冷读切到 <code>localhost</code> 独立源后，诊断复现下从 13 过 1 败变为 14 过 0 败，修复后 Node 22 + Chrome 全量 1330 通过 / 0 失败。</li>
+                </ul>
+              `
+            },
+            {
+              id: "vm4d-sec-4",
+              heading: "三、多 Agent 与开源协作的几条实操经验",
+              html: `
+                <p>这四天几乎全程都在用「主会话推进实现 + 独立子会话复核 + 外部自动评审（Codex）+ 上游作者评审」的流水线。跑顺之后，有几条经验非常管用：</p>
+                <figure class="prose-figure">
+                  <img src="${IMAGES.macosAgentWorkflow}" alt="主会话实现，独立会话复核 P0/P1，再提交 PR，由 Codex 和上游作者评审。两阶段的评审意见都回到主会话跟进验证。" loading="lazy" data-prose-zoom="true" role="button" tabindex="0" />
+                  <figcaption>图 2 · 多 Agent 与开源评审的分工和反馈路径</figcaption>
+                </figure>
+                <ol>
+                  <li><strong>推进阶段让独立复核聚焦 P0/P1，推上游后再按需处理影响体验的 P2</strong><br />主会话写久了容易产生盲区，拉一个全新的独立会话只拿 diff 和仓库上下文做复核，非常容易抓出竞态、清理遗漏和边界条件（比如 #103 的信号监听细节、#117 里独立会话甚至通过延后保存确认把思绪冷读的竞态稳定复现了出来）。在推进阶段明确要求「只报 P0/P1、不改代码、不推分支」，并不是彻底放弃 P2/P3，而是为了在效率与质量之间做阶段性取舍：先防止内部复核滑向无休止的风格挑刺，把主干稳住；等推送到上游后，面对作者评审或外部 review 提出、确实影响使用体验的 P2 问题，再认真跟进修复。</li>
+                  <li><strong>连续打补丁时要及时止损、换思路</strong><br />PR #111 的 30 轮说明，复核会话很擅长找边界反例，但它默认会在你现有的实现方式上持续挑错。如果连续两三轮都在修同一类边界，主导者必须主动喊停，决定是换数据结构/解析方式，还是接受范围边界，不要陷入无限打地鼠。</li>
+                  <li><strong>尽早把实测结果同步给上游，别闷头做完再聊</strong><br />无论是 <code>brew install</code> 的定位、#109 的 Edge 实测数据，还是 #105 上游直接往分支补 commit，本质上都是把「单向提 PR」变成了「和作者一起把问题推进落地」。很多时候一条带数据的短评论，比写完一整份大 PR 更有价值。</li>
+                  <li><strong>把协作规范固化成硬规则，顺手还清工具链旧账</strong><br />刚起步做 #103 时踩过两个很尴尬的坑：一是基于 fork 的 <code>main</code> 建分支，把本地的 <code>18787</code> 端口约定带进了 PR diff；二是有一轮行内回复意外发出了非中文内容。之后直接立了四条铁律：
+                    <ul>
+                      <li>向上游提 PR 一律从干净的 <code>upstream/main</code> 建分支；</li>
+                      <li>显式检查提交作者与邮箱，不夹带无关署名；</li>
+                      <li>对外文字发前逐条核对中文与语气，不生搬硬套双语模板；</li>
+                      <li>个人访问令牌（PAT）提前配齐所需权限——#75 时因为缺少 <code>workflow</code> scope 靠 Git Data API 绕了一次路，#117 基线含 <code>ci.yml</code> 改动又撞上同一道墙，这次直接补齐权限才算彻底解决。</li>
+                    </ul>
+                    这几条定下来之后，后面 4 个 PR 再没出过一次流程返工。</li>
+                </ol>
+              `
+            },
+            {
+              id: "vm4d-sec-5",
+              heading: "四、写在最后",
+              html: `
+                <p>截至 11 月 20 日早上，这轮计划里的 macOS 适配任务和 v1.4.0 全面验收已经全部收尾合入。</p>
+                <p>当然，基于 VM 的验收也有明确边界：实体 Mac（特别是真实桌面环境下的下载、解压与首次双击 <code>start.command</code>）、Intel 芯片机型、其他 macOS 大版本以及真实云厂商账号，都还没有实机覆盖。这些未测范围已经原样写进了挂在 #117 下方的验收报告里——诚实地标出「测了什么」和「没法测什么」，本身就是跨平台维护的一部分。</p>
+                <p>对我来说，这四天最大的收获不只是合入了 5 个 PR，而是验证了一套在资源受限（没有真机）的条件下，依然能靠<strong>严谨的对照实验、小步快跑的 PR 节奏、以及分工清晰的独立复核</strong>，把开源跨平台适配稳稳落地的工程方法。</p>
+              `
+            },
+            {
+              id: "vm4d-sec-6",
+              heading: "后记",
+              html: `
+                <p>写完这篇复盘，最后想单独谢谢这次全程帮上大忙的 Devin。</p>
+                <p>哪怕只是在 Devin Pro 有限的资源配额下，它提供的近乎原生的 macOS VM，也让我这个手头没有实体 Mac 的人，拥有了接近实机的开发和验收环境——把以前在 Windows 上只能靠翻文档、盲等 GitHub CI 碰运气的问题，真正落到了可复现、可排查的现场里。</p>
+                <p>这段感谢并不是商单，只是用下来确实能感受到团队在认真解决开发者的痛点。很多时候我觉得，Devin 的设计基点不只是“做一个 Agent 帮单个开发者在本地写代码”，而是站在更完整的工程链条上，去思考团队如何面向真实用户可靠地完成开发、部署、上线、更新与维护。至少我认为，在这个 AI 高速发展、不断冲击人们固有认知的时代里，Cognition 团队交出了属于他们自己独特角度的思考与答案；整个产品的设计思路和规划，相比起追逐潮流的各类 AI slop，显然包含着他们一路坚持着的审美与设计哲学。加上 Devin Desktop 本身很出色的界面设计，这四天在里面持续推进项目的过程，我其实一直挺享受的。谢谢你们。</p>
+              `
+            }
+          ]
+        },
+        {
           id: "post-agent-second-pass",
           issueNo: "ISSUE 07",
           pinned: false,
@@ -1551,6 +1708,11 @@ debug = 1</code></pre>
       ];
 
       const MICRO_LOGS = [
+        {
+          date: '11.20',
+          tag: 'Upstream / macOS VM',
+          text: "没有实体 Mac 的四天，我靠云端 ARM64 macOS VM 给 yan 做适配，连续合入 #103 / #105 / #109 / #111 / #117 五个 PR。做 #111 是最挣扎的一个阶段。30 轮补丁依然无法完全修复引号、转义和重定向带来的边界问题，最后改用 shellWord / scanWrites 做词法扫描。用 Safari 下载的正式 ZIP，在 VM 里手动解压时提示「已损坏」。我做了四组对照实验（纯文本 ZIP、第二台 VM、无害脚本、无隔离原件），结合完整性校验确认问题不在打包器。报错可能跟这套 macOS VM 的环境限制有关。我们手头都没有实体 Mac，没法用同一个 ZIP 做实机对照，报错的原因就留了个尾巴。多亏 Devin 提供了 macOS VM。少了这个环境，我可能还要花更久才能走到这一步吧。"
+        },
         {
           date: '11.17',
           tag: 'Agent / Upstream #17',
